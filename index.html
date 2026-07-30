@@ -102,26 +102,48 @@
         .hangar-ceiling .beam:nth-child(2) { top: 28%; opacity: 0.85; }
         .hangar-ceiling .beam:nth-child(3) { top: 48%; opacity: 0.65; height: 10px; }
 
-        /* Hanging industrial fixtures + soft downward light cones */
+        /* Hanging industrial fixtures (sized to match cone aperture) + soft cones */
         .lamp {
             position: absolute;
-            top: 11%;
-            width: 46px;
-            height: 26px;
-            border-radius: 4px 4px 42% 42%;
-            background: linear-gradient(180deg, #3c3c38 0%, #1c1c1a 100%);
-            border: 1px solid #2a2a28;
+            top: 8%;
+            width: 92px;
+            height: 52px;
+            border-radius: 8px 8px 48% 48%;
+            background:
+                linear-gradient(180deg, #4a4a44 0%, #2e2e2a 40%, #181816 100%);
+            border: 2px solid #2a2a26;
+            box-shadow:
+                inset 0 2px 0 rgba(255, 255, 255, 0.08),
+                0 3px 6px rgba(0, 0, 0, 0.45);
             /* No omnidirectional halo — light only falls as a cone below */
-            box-shadow: none;
             z-index: 2;
             overflow: visible;
+        }
+
+        /* Fixture housing lip / shade edge */
+        .lamp::after {
+            content: '';
+            position: absolute;
+            left: 8%;
+            right: 8%;
+            bottom: -6px;
+            height: 14px;
+            border-radius: 0 0 50% 50%;
+            background: linear-gradient(180deg, #2a2a26 0%, #121210 100%);
+            border: 1px solid #1a1a18;
+            border-top: none;
+            box-shadow:
+                0 4px 12px 2px rgba(255, 230, 170, 0.35),
+                0 0 20px 4px rgba(255, 220, 150, 0.2),
+                inset 0 -2px 6px rgba(255, 240, 200, 0.55);
+            pointer-events: none;
         }
 
         /* Soft cone of light (wide at the bottom, fades out) */
         .lamp::before {
             content: '';
             position: absolute;
-            top: 90%;
+            top: 100%;
             left: 50%;
             transform: translateX(-50%);
             width: 300px;
@@ -135,39 +157,30 @@
                 rgba(255, 200, 110, 0.015) 72%,
                 transparent 100%
             );
-            /* Trapezoid = soft spotlight cone */
-            clip-path: polygon(40% 0%, 60% 0%, 100% 100%, 0% 100%);
+            /* Top width ~ fixture width so cone starts from the shade */
+            clip-path: polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%);
             filter: blur(14px);
             opacity: 0.9;
             pointer-events: none;
             z-index: -1;
         }
 
-        /* Bright bulb at the fixture only */
-        .lamp::after {
-            content: '';
-            position: absolute;
-            left: 18%;
-            right: 18%;
-            bottom: -2px;
-            height: 7px;
-            border-radius: 50%;
-            background: rgba(255, 242, 210, 0.85);
-            box-shadow:
-                0 2px 8px 1px rgba(255, 230, 170, 0.4),
-                0 4px 14px 2px rgba(255, 220, 150, 0.15);
-            pointer-events: none;
+        .lamp-a { left: 16%; }
+        .lamp-b { left: 50%; transform: translateX(-50%); }
+        .lamp-c { right: 16%; left: auto; }
+
+        /* Middle lamp: larger fixture + stronger cone */
+        .lamp-b {
+            width: 110px;
+            height: 60px;
+            top: 7%;
         }
 
-        .lamp-a { left: 18%; }
-        .lamp-b { left: 50%; transform: translateX(-50%); }
-        .lamp-c { right: 18%; left: auto; }
-
-        /* Middle lamp slightly stronger / longer cone */
         .lamp-b::before {
-            width: 340px;
+            width: 360px;
             height: min(78vh, 700px);
             opacity: 1;
+            clip-path: polygon(26% 0%, 74% 0%, 100% 100%, 0% 100%);
             background: linear-gradient(
                 180deg,
                 rgba(255, 240, 205, 0.42) 0%,
@@ -177,6 +190,11 @@
                 rgba(255, 200, 110, 0.015) 70%,
                 transparent 100%
             );
+        }
+
+        .lamp-b::after {
+            height: 16px;
+            bottom: -7px;
         }
 
         /* Soft floor only — no dark rectangular door/panel behind the CRT */
