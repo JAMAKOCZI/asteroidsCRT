@@ -25,8 +25,10 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 | Key | Action |
 |-----|--------|
 | **Left / Right** | Turn |
-| **Tab** | Boost / thrust |
+| **Up / W** | Boost / thrust (Tab also works) |
 | **Space** | Fire |
+| **P** | Pause / resume |
+| **Any key** | Start from title screen |
 | **R** | Restart (after game over) |
 | **A–Z**, **Enter** | Enter high-score initials |
 
@@ -64,7 +66,9 @@ Then open [http://localhost:8080](http://localhost:8080).
 
 ## Project status
 
-Current code is the **baseline** arcade build. Planned polish (bugfixes, classic controls, delta time, title screen, Web Audio, pause) will land in later commits.
+Arcade polish (approach A) is implemented: safe collisions, top-10 high scores,
+delta-time physics, classic boost keys, unique asteroid shapes, title screen,
+pause, and Web Audio SFX. See `docs/superpowers/specs/` for the design note.
 
 ---
 

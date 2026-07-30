@@ -152,8 +152,9 @@
             return score > board[board.length - 1].score;
         }
 
-        // Game state
+        // Game state — mode: title | playing | paused | gameover
         let gameState = {
+            mode: 'title',
             lives: 3,
             score: 0,
             level: 1,
@@ -167,6 +168,66 @@
         // Physics tuned for 60 FPS; multiply rates by (dt * 60)
         const TARGET_FPS = 60;
         let lastFrameTime = 0;
+        let lastThrustSound = 0;
+
+        // --- Web Audio (no asset files; unlocked on first user gesture) ---
+        let audioCtx = null;
+
+        function ensureAudio() {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            if (!audioCtx) audioCtx = new AC();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        function playTone(freq, duration, type, volume) {
+            const ctx = ensureAudio();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type || 'square';
+            osc.frequency.value = freq;
+            const now = ctx.currentTime;
+            const vol = volume == null ? 0.04 : volume;
+            gain.gain.setValueAtTime(vol, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        function playNoise(duration, volume) {
+            const ctx = ensureAudio();
+            if (!ctx) return;
+            const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
+            const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < len; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = buffer;
+            const gain = ctx.createGain();
+            gain.gain.value = volume == null ? 0.06 : volume;
+            src.connect(gain);
+            gain.connect(ctx.destination);
+            src.start();
+        }
+
+        function sfxShoot() { playTone(720, 0.05, 'square', 0.03); }
+        function sfxExplode() { playNoise(0.18, 0.07); }
+        function sfxDeath() { playNoise(0.28, 0.09); playTone(90, 0.25, 'sawtooth', 0.04); }
+        function sfxAlienHit() { playTone(520, 0.08, 'square', 0.05); playTone(780, 0.1, 'square', 0.04); }
+        function sfxThrust() {
+            const now = performance.now();
+            if (now - lastThrustSound < 80) return;
+            lastThrustSound = now;
+            playNoise(0.06, 0.015);
+        }
 
         // Input handling
         const keys = {};
@@ -177,10 +238,26 @@
                 e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
                 e.preventDefault();
             }
-            
+
+            // Title: any key starts (and unlocks audio)
+            if (gameState.mode === 'title') {
+                ensureAudio();
+                startGame();
+                return;
+            }
+
             if (gameState.enteringInitials) {
                 handleInitialsInput(e);
-            } else if (e.code === 'KeyR' && gameState.gameOver) {
+                return;
+            }
+
+            if (e.code === 'KeyP' && (gameState.mode === 'playing' || gameState.mode === 'paused')) {
+                gameState.mode = gameState.mode === 'playing' ? 'paused' : 'playing';
+                return;
+            }
+
+            if (e.code === 'KeyR' && gameState.gameOver) {
+                ensureAudio();
                 restartGame();
             }
         });
@@ -404,6 +481,7 @@
         // End game
         function endGame() {
             gameState.gameOver = true;
+            gameState.mode = 'gameover';
             gameOverElement.style.display = 'block';
             
             if (qualifiesForHighScore(gameState.score)) {
@@ -416,6 +494,34 @@
                 gameOverText.textContent = "GAME OVER";
                 showLeaderboard();
             }
+        }
+
+        // First key from title screen
+        function startGame() {
+            gameState.mode = 'playing';
+            gameState.lives = 3;
+            gameState.score = 0;
+            gameState.level = 1;
+            gameState.gameOver = false;
+            gameState.enteringInitials = false;
+            gameState.initials = '';
+            missiles = [];
+            particles = [];
+            alienShip = null;
+            alienMissiles = [];
+            resetShip();
+            createAsteroids();
+            gameOverElement.style.display = 'none';
+            initialsPrompt.style.display = 'none';
+            leaderboard.style.display = 'none';
+            restartPrompt.style.display = 'block';
+            updateHud();
+        }
+
+        function updateHud() {
+            livesElement.textContent = gameState.lives;
+            scoreElement.textContent = gameState.score;
+            levelElement.textContent = gameState.level;
         }
 
         // Handle initials input
@@ -473,9 +579,24 @@
             ship.invulnerable = 120; // 2 seconds of invulnerability
         }
 
+        // Ambient drift on title (rocks only)
+        function updateTitleAmbient(dt) {
+            const f = dt * TARGET_FPS;
+            asteroids.forEach(asteroid => {
+                asteroid.x += asteroid.vx * f;
+                asteroid.y += asteroid.vy * f;
+                asteroid.rotation += asteroid.rotationSpeed * f;
+                wrap(asteroid);
+            });
+        }
+
         // Game update loop (dt in seconds; f scales 60 FPS-tuned values)
         function update(dt) {
-            if (gameState.gameOver) return;
+            if (gameState.mode === 'title') {
+                updateTitleAmbient(dt);
+                return;
+            }
+            if (gameState.mode !== 'playing' || gameState.gameOver) return;
             const f = dt * TARGET_FPS;
 
             // Handle input
@@ -489,6 +610,7 @@
                 ship.boosting = true;
                 ship.vx += Math.cos(ship.angle) * 0.3 * f;
                 ship.vy += Math.sin(ship.angle) * 0.3 * f;
+                sfxThrust();
                 
                 // Add thruster particles
                 const thrusterX = ship.x - Math.cos(ship.angle) * 15;
@@ -513,6 +635,7 @@
                         ship.y + Math.sin(ship.angle) * 12,
                         ship.angle
                     ));
+                    sfxShoot();
                     keys.spacePressed = true;
                 }
             } else {
@@ -596,6 +719,7 @@
                         }
                         const pieces = breakAsteroid(asteroids[ai]);
                         if (pieces) splitAsteroids.push(...pieces);
+                        sfxExplode();
                         asteroidsToRemove.add(ai);
                         missilesToRemove.add(mi);
                     }
@@ -608,6 +732,7 @@
                     if (checkCollision(missiles[mi], alienShip, 2, alienShip.size)) {
                         gameState.score += 500;
                         createParticles(alienShip.x, alienShip.y, 10);
+                        sfxAlienHit();
                         killAlien = true;
                         missilesToRemove.add(mi);
                         break;
@@ -657,6 +782,7 @@
                 if (diedThisFrame) {
                     gameState.lives--;
                     createParticles(ship.x, ship.y, 12);
+                    sfxDeath();
                     if (gameState.lives <= 0) {
                         endGame();
                     } else {
@@ -670,10 +796,7 @@
                 nextLevel();
             }
 
-            // Update UI
-            livesElement.textContent = gameState.lives;
-            scoreElement.textContent = gameState.score;
-            levelElement.textContent = gameState.level;
+            updateHud();
         }
 
         // Render function
@@ -686,8 +809,9 @@
             ctx.fillStyle = '#00ff00';
             ctx.lineWidth = 2;
 
-            // Draw ship
-            if (ship.invulnerable === 0 || Math.floor(ship.invulnerable / 5) % 2) {
+            // Draw ship (not on title — rocks-only ambiance)
+            if (gameState.mode !== 'title' &&
+                (ship.invulnerable === 0 || Math.floor(ship.invulnerable / 5) % 2)) {
                 ctx.save();
                 ctx.translate(ship.x, ship.y);
                 ctx.rotate(ship.angle);
@@ -786,6 +910,50 @@
                 ctx.fillStyle = `rgba(0, 255, 0, ${alpha})`;
                 ctx.fillRect(particle.x, particle.y, 2, 2);
             });
+
+            // Title overlay
+            if (gameState.mode === 'title') {
+                ctx.fillStyle = 'rgba(0, 8, 0, 0.55)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00ff00';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 48px "Courier New", monospace';
+                ctx.shadowColor = '#00ff00';
+                ctx.shadowBlur = 16;
+                ctx.fillText('ASTEROIDS', canvas.width / 2, canvas.height / 2 - 40);
+                ctx.font = '20px "Courier New", monospace';
+                ctx.shadowBlur = 8;
+                ctx.fillText('CRT EDITION', canvas.width / 2, canvas.height / 2 + 10);
+                ctx.font = '16px "Courier New", monospace';
+                ctx.shadowBlur = 6;
+                const blink = Math.floor(performance.now() / 500) % 2;
+                if (blink) {
+                    ctx.fillText('PRESS ANY KEY', canvas.width / 2, canvas.height / 2 + 60);
+                }
+                ctx.shadowBlur = 0;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
+
+            // Pause overlay
+            if (gameState.mode === 'paused') {
+                ctx.fillStyle = 'rgba(0, 8, 0, 0.45)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00ff00';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 36px "Courier New", monospace';
+                ctx.shadowColor = '#00ff00';
+                ctx.shadowBlur = 12;
+                ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+                ctx.font = '14px "Courier New", monospace';
+                ctx.shadowBlur = 6;
+                ctx.fillText('Press P to resume', canvas.width / 2, canvas.height / 2 + 36);
+                ctx.shadowBlur = 0;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
         }
 
         // Game loop with delta time (capped after tab blur)
@@ -801,9 +969,10 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Restart game
+        // Restart game (from game over → playing)
         function restartGame() {
             gameState = {
+                mode: 'playing',
                 lives: 3,
                 score: 0,
                 level: 1,
@@ -822,11 +991,13 @@
             initialsPrompt.style.display = 'none';
             leaderboard.style.display = 'none';
             restartPrompt.style.display = 'block';
+            updateHud();
         }
 
-        // Initialize game
+        // Initialize: title screen with drifting rocks
         createAsteroids();
         resetShip();
+        ship.invulnerable = 0;
         gameLoop();
     </script>
 </body>
