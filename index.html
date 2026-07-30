@@ -203,71 +203,195 @@
             .scene { transform: scale(0.58); }
         }
 
-        /* Workbench table */
-        .table-top {
+        /*
+         * Desk in side / front elevation (not top-down):
+         * CRT sits on its base → thin top edge → thick apron face → legs.
+         * Table is UNDER the computer, wider than the CRT base only.
+         */
+        .desk {
             position: relative;
-            padding: 28px 40px 18px;
-            background:
-                linear-gradient(180deg, #5a4e42 0%, #3f362e 12%, #342c26 88%, #2a241e 100%);
-            border-radius: 4px 4px 2px 2px;
-            box-shadow:
-                0 2px 0 #1a1612,
-                0 14px 28px rgba(0, 0, 0, 0.55),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08),
-                inset 0 -8px 16px rgba(0, 0, 0, 0.25);
-            border: 1px solid #2a241e;
-        }
-
-        .table-top::before {
-            /* wood-ish grain */
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            opacity: 0.2;
-            pointer-events: none;
-            background: repeating-linear-gradient(
-                92deg,
-                transparent 0px,
-                transparent 7px,
-                rgba(0, 0, 0, 0.12) 7px,
-                rgba(0, 0, 0, 0.12) 8px
-            );
-        }
-
-        .table-edge {
-            width: 100%;
-            height: 16px;
+            width: 980px;
             margin-top: -2px;
-            background: linear-gradient(180deg, #2a241e, #1a1612);
-            border-radius: 0 0 3px 3px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             z-index: 1;
         }
 
-        .table-legs {
-            display: flex;
-            justify-content: space-between;
-            width: 88%;
-            height: 52px;
-            margin-top: -2px;
+        /* Thin strip = tabletop seen from the side (depth foreshortened) */
+        .desk-top-edge {
+            width: 100%;
+            height: 10px;
+            background: linear-gradient(
+                180deg,
+                #7a6a58 0%,
+                #5c4e40 45%,
+                #3e342c 100%
+            );
+            border-radius: 2px 2px 0 0;
+            box-shadow:
+                0 -1px 0 rgba(255, 255, 255, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            position: relative;
+            z-index: 3;
+        }
+
+        /* Props stand on the top edge, beside the CRT feet */
+
+        /* Where the CRT feet rest — contact shadow on the top edge */
+        .desk-top-edge::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 2px;
+            transform: translateX(-50%);
+            width: 240px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.35);
+            filter: blur(3px);
             pointer-events: none;
         }
 
-        .table-legs span {
-            width: 18px;
-            height: 100%;
-            background: linear-gradient(90deg, #1f1c18, #3a342e 40%, #1a1714);
-            box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.45);
+        /* Thick front face of the tabletop (side view of board thickness) */
+        .desk-apron {
+            width: 100%;
+            height: 52px;
+            background:
+                repeating-linear-gradient(
+                    90deg,
+                    transparent 0,
+                    transparent 11px,
+                    rgba(0, 0, 0, 0.08) 11px,
+                    rgba(0, 0, 0, 0.08) 12px
+                ),
+                linear-gradient(
+                    180deg,
+                    #4a3f34 0%,
+                    #3a322a 18%,
+                    #2e2822 70%,
+                    #221e1a 100%
+                );
+            border-left: 1px solid #1a1612;
+            border-right: 1px solid #1a1612;
+            border-bottom: 1px solid #120f0c;
+            box-shadow:
+                inset 0 3px 6px rgba(0, 0, 0, 0.35),
+                inset 0 -2px 4px rgba(0, 0, 0, 0.4),
+                0 12px 24px rgba(0, 0, 0, 0.45);
+            position: relative;
+            z-index: 2;
         }
 
-        /* —— CRT chassis —— */
+        /* Slight bevel on left/right ends of apron (side thickness hint) */
+        .desk-apron::before,
+        .desk-apron::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            pointer-events: none;
+        }
+        .desk-apron::before {
+            left: 0;
+            background: linear-gradient(90deg, rgba(0,0,0,0.35), transparent);
+        }
+        .desk-apron::after {
+            right: 0;
+            background: linear-gradient(270deg, rgba(0,0,0,0.35), transparent);
+        }
+
+        .desk-legs {
+            display: flex;
+            justify-content: space-between;
+            width: 92%;
+            height: 70px;
+            margin-top: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .desk-legs span {
+            width: 22px;
+            height: 100%;
+            background: linear-gradient(90deg, #1a1612 0%, #3a322a 35%, #2a241e 70%, #151210 100%);
+            box-shadow: 4px 6px 14px rgba(0, 0, 0, 0.5);
+            border-radius: 0 0 2px 2px;
+            position: relative;
+        }
+
+        .desk-legs span::after {
+            /* foot pad */
+            content: '';
+            position: absolute;
+            left: -4px;
+            right: -4px;
+            bottom: 0;
+            height: 6px;
+            background: #1a1612;
+            border-radius: 1px;
+        }
+
+        /* Props sit on the top edge, left/right of the CRT base */
+        .desk-prop {
+            position: absolute;
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        .desk-prop.mug {
+            left: 48px;
+            bottom: 100%;
+            margin-bottom: 0;
+            width: 22px;
+            height: 30px;
+            background: linear-gradient(90deg, #8a4030, #c06040 50%, #6a3020);
+            border-radius: 3px 3px 4px 4px;
+            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .desk-prop.mug::before {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: 7px;
+            width: 8px;
+            height: 12px;
+            border: 2px solid #8a4030;
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .desk-prop.floppy {
+            right: 56px;
+            bottom: 100%;
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(145deg, #3a5a9a, #2a4070);
+            border-radius: 2px;
+            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.4);
+            border: 1px solid #1a2a50;
+        }
+
+        .desk-prop.floppy::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            right: 5px;
+            top: 5px;
+            height: 9px;
+            background: #c8c0b0;
+            border-radius: 1px;
+        }
+
+        /* —— CRT chassis (stands above desk, base rests on top edge) —— */
         .crt-computer {
             position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
+            z-index: 6;
         }
 
         .crt-case {
@@ -523,78 +647,30 @@
             letter-spacing: 0.2em;
         }
 
-        /* Monitor neck / stand */
+        /* Monitor neck / stand — sits on desk top edge */
         .crt-neck {
             width: 120px;
-            height: 28px;
-            margin-top: -2px;
+            height: 32px;
+            margin-top: -1px;
             background: linear-gradient(90deg, #8a8070, #c4b8a0 40%, #a09888 60%, #7a7060);
             border-radius: 0 0 6px 6px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             position: relative;
-            z-index: 0;
-        }
-
-        .crt-base {
-            width: 220px;
-            height: 18px;
-            margin-top: -2px;
-            background: linear-gradient(180deg, #b0a690, #8a8070 60%, #6a6458);
-            border-radius: 40% 40% 8px 8px;
-            box-shadow:
-                0 4px 10px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2);
-        }
-
-        /* Optional props on table */
-        .table-prop {
-            position: absolute;
-            pointer-events: none;
             z-index: 2;
         }
 
-        .floppy {
-            right: 18px;
-            bottom: 22px;
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(145deg, #3a5a9a, #2a4070);
-            border-radius: 2px;
-            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.4);
-            border: 1px solid #1a2a50;
-        }
-
-        .floppy::after {
-            content: '';
-            position: absolute;
-            left: 6px;
-            right: 6px;
-            top: 6px;
-            height: 10px;
-            background: #c8c0b0;
-            border-radius: 1px;
-        }
-
-        .mug {
-            left: 16px;
-            bottom: 20px;
-            width: 22px;
-            height: 28px;
-            background: linear-gradient(90deg, #8a4030, #c06040 50%, #6a3020);
-            border-radius: 3px 3px 4px 4px;
-            box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.35);
-        }
-
-        .mug::before {
-            content: '';
-            position: absolute;
-            right: -8px;
-            top: 6px;
-            width: 8px;
-            height: 12px;
-            border: 2px solid #8a4030;
-            border-left: none;
-            border-radius: 0 8px 8px 0;
+        .crt-base {
+            width: 240px;
+            height: 20px;
+            margin-top: -1px;
+            background: linear-gradient(180deg, #b0a690, #8a8070 55%, #6a6458);
+            border-radius: 50% 50% 6px 6px / 60% 60% 40% 40%;
+            box-shadow:
+                0 2px 0 #4a4438,
+                0 6px 12px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            position: relative;
+            z-index: 3;
         }
     </style>
 </head>
@@ -612,76 +688,80 @@
         <div class="hangar-floor" aria-hidden="true"></div>
 
         <div class="scene">
-            <div class="table-top">
-                <div class="table-prop mug" aria-hidden="true"></div>
-                <div class="table-prop floppy" aria-hidden="true"></div>
+            <!-- CRT stands freely; its base rests on the desk below -->
+            <div class="crt-computer">
+                <div class="crt-case">
+                    <div class="crt-vents" aria-hidden="true">
+                        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                    </div>
+                    <div class="crt-badge-row">
+                        <div class="crt-badge">VECTOR <span>ASTRO</span></div>
+                        <div class="crt-led" title="Power"></div>
+                    </div>
 
-                <div class="crt-computer">
-                    <div class="crt-case">
-                        <div class="crt-vents" aria-hidden="true">
-                            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-                            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-                        </div>
-                        <div class="crt-badge-row">
-                            <div class="crt-badge">VECTOR <span>ASTRO</span></div>
-                            <div class="crt-led" title="Power"></div>
-                        </div>
-
-                        <div class="crt-screen-well">
-                            <div class="crt-screen-lip">
-                                <div class="crt-screen">
-                                    <canvas id="gameCanvas" width="800" height="600"></canvas>
-                                    <div class="crt-overlay"></div>
-                                    <div class="ui">
-                                        <div>SHIPS: <span id="lives">3</span></div>
-                                        <div>SCORE: <span id="score">0</span></div>
-                                        <div>LEVEL: <span id="level">1</span></div>
+                    <div class="crt-screen-well">
+                        <div class="crt-screen-lip">
+                            <div class="crt-screen">
+                                <canvas id="gameCanvas" width="800" height="600"></canvas>
+                                <div class="crt-overlay"></div>
+                                <div class="ui">
+                                    <div>SHIPS: <span id="lives">3</span></div>
+                                    <div>SCORE: <span id="score">0</span></div>
+                                    <div>LEVEL: <span id="level">1</span></div>
+                                </div>
+                                <div class="controls">
+                                    LEFT/RIGHT or A/D: Turn<br>
+                                    UP / W: Boost<br>
+                                    SPACE: Fire<br>
+                                    H / DOWN: Hyperspace<br>
+                                    P: Pause
+                                </div>
+                                <div id="gameOver" class="game-over" style="display: none;">
+                                    <div id="gameOverText">GAME OVER</div>
+                                    <div id="initialsPrompt" style="display: none; font-size: 16px; margin-top: 20px;">
+                                        <div>HIGH SCORE! Enter your initials:</div>
+                                        <div style="font-size: 24px; margin: 10px 0; letter-spacing: 4px;" id="initialsDisplay">___</div>
+                                        <div style="font-size: 12px;">Use A-Z keys, Enter to confirm</div>
                                     </div>
-                                    <div class="controls">
-                                        LEFT/RIGHT or A/D: Turn<br>
-                                        UP / W: Boost<br>
-                                        SPACE: Fire<br>
-                                        H / DOWN: Hyperspace<br>
-                                        P: Pause
+                                    <div id="leaderboard" style="display: none; font-size: 14px; margin-top: 20px;">
+                                        <div style="font-size: 18px; margin-bottom: 15px;">HIGH SCORES</div>
+                                        <div id="leaderboardList"></div>
                                     </div>
-                                    <div id="gameOver" class="game-over" style="display: none;">
-                                        <div id="gameOverText">GAME OVER</div>
-                                        <div id="initialsPrompt" style="display: none; font-size: 16px; margin-top: 20px;">
-                                            <div>HIGH SCORE! Enter your initials:</div>
-                                            <div style="font-size: 24px; margin: 10px 0; letter-spacing: 4px;" id="initialsDisplay">___</div>
-                                            <div style="font-size: 12px;">Use A-Z keys, Enter to confirm</div>
-                                        </div>
-                                        <div id="leaderboard" style="display: none; font-size: 14px; margin-top: 20px;">
-                                            <div style="font-size: 18px; margin-bottom: 15px;">HIGH SCORES</div>
-                                            <div id="leaderboardList"></div>
-                                        </div>
-                                        <div id="restartPrompt" style="font-size: 16px; margin-top: 20px;">Press R to Restart</div>
-                                    </div>
+                                    <div id="restartPrompt" style="font-size: 16px; margin-top: 20px;">Press R to Restart</div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="crt-front-panel">
-                            <div class="crt-knobs">
-                                <div class="knob-wrap">
-                                    <div class="knob" aria-hidden="true"></div>
-                                    <div class="knob-label">BRT</div>
-                                </div>
-                                <div class="knob-wrap">
-                                    <div class="knob" aria-hidden="true"></div>
-                                    <div class="knob-label">CNT</div>
-                                </div>
-                            </div>
-                            <div class="crt-model">VM-800 CRT</div>
-                            <div class="crt-power-btn" title="Power" aria-hidden="true"></div>
                         </div>
                     </div>
-                    <div class="crt-neck" aria-hidden="true"></div>
-                    <div class="crt-base" aria-hidden="true"></div>
+
+                    <div class="crt-front-panel">
+                        <div class="crt-knobs">
+                            <div class="knob-wrap">
+                                <div class="knob" aria-hidden="true"></div>
+                                <div class="knob-label">BRT</div>
+                            </div>
+                            <div class="knob-wrap">
+                                <div class="knob" aria-hidden="true"></div>
+                                <div class="knob-label">CNT</div>
+                            </div>
+                        </div>
+                        <div class="crt-model">VM-800 CRT</div>
+                        <div class="crt-power-btn" title="Power" aria-hidden="true"></div>
+                    </div>
                 </div>
+                <div class="crt-neck" aria-hidden="true"></div>
+                <div class="crt-base" aria-hidden="true"></div>
             </div>
-            <div class="table-edge" aria-hidden="true"></div>
-            <div class="table-legs" aria-hidden="true"><span></span><span></span></div>
+
+            <!-- Desk under the CRT: side elevation, not top-down -->
+            <div class="desk" aria-hidden="true">
+                <div class="desk-top-edge">
+                    <div class="desk-prop mug"></div>
+                    <div class="desk-prop floppy"></div>
+                </div>
+                <div class="desk-apron"></div>
+                <div class="desk-legs"><span></span><span></span></div>
+            </div>
         </div>
     </div>
 
