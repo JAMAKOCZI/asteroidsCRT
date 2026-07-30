@@ -2,8 +2,6 @@
 
 Classic **Asteroids**-style arcade game in the browser, with a CRT hangar look.
 
-![Asteroids CRT preview — vector game on a beige CRT in a hangar](docs/media/asteroids-crt-preview.jpg)
-
 **Play:** open [`index.html`](index.html) in a modern browser (Chrome, Firefox, Edge).  
 **No build step, no npm, no server required** — one self-contained file.
 
