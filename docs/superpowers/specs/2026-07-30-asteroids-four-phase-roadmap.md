@@ -129,9 +129,9 @@
 `18 tests → 20 media → 19 mobile (opcjonalnie / skip)`.
 
 **Kryterium ukończenia fazy 4**
-- [ ] CI-lokalnie: testy przechodzą na logice bez przeglądarki
-- [ ] README pokazuje jak gra wygląda
-- [ ] Mobile (jeśli w ogóle) nie psuje CRT layout na desktopie
+- [x] CI-lokalnie: testy przechodzą na logice bez przeglądarki
+- [x] README pokazuje jak gra wygląda
+- [x] Mobile (jeśli w ogóle) nie psuje CRT layout na desktopie (świadomy skip full touch pad)
 
 **Szacunek:** mały (18+20) lub średni z mobile.
 

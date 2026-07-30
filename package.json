@@ -1,0 +1,12 @@
+{
+  "name": "asteroids-crt",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Classic Asteroids in a CRT hangar — vanilla HTML/Canvas",
+  "scripts": {
+    "test": "node --test test/game-logic.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,10 +1,12 @@
 # Asteroids CRT
 
-Classic **Asteroids**-style arcade game in the browser, with a green CRT / vector look.
+Classic **Asteroids**-style arcade game in the browser, with a CRT hangar look.
 
-**Play:** open [`index.html`](index.html) in a modern browser (Chrome, Firefox, Edge). No build step.
+![Asteroids CRT preview — vector game on a beige CRT in a hangar](docs/media/asteroids-crt-preview.jpg)
 
-**Desktop keyboard only** — no touch / mobile controls.
+**Play:** open [`index.html`](index.html) in a modern browser (Chrome, Firefox, Edge). Prefer a local server so `game-logic.js` loads (see below).
+
+**Best on desktop keyboard.** No full touch controls (layout still scales on small screens).
 
 Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/asteroidsCRT)
 
@@ -61,7 +63,9 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
    ```
 2. Open `index.html` in your browser (double-click or drag into a window).
 
-### Simple local server (optional)
+> If the browser blocks loading `game-logic.js` from `file://`, use a local server (below). The game falls back to inline helpers if the script is missing.
+
+### Simple local server (recommended)
 
 ```bash
 # Python 3
@@ -72,18 +76,33 @@ Then open [http://localhost:8080](http://localhost:8080).
 
 ---
 
+## Tests
+
+Pure gameplay helpers live in [`game-logic.js`](game-logic.js) and are covered by Node’s built-in test runner (no install):
+
+```bash
+npm test
+# or
+node --test test/game-logic.test.js
+```
+
+Covers wrap, phosphor cycle, combo mult, high-score eligibility, daily seed stability, spawn delay math, leaderboard sanitization, and more.
+
+---
+
 ## Tech
 
-- Single file: HTML + CSS + Canvas 2D + vanilla JavaScript
-- No dependencies, no bundler
-- High scores: browser `localStorage` key `asteroidsLeaderboard`
+- Browser: `index.html` + `game-logic.js` (HTML / CSS / Canvas 2D / vanilla JS)
+- No bundler, no runtime dependencies
+- High scores: `localStorage` (classic / daily / challenge keys)
+- Logic shared with Node tests via `game-logic.js`
 
 ---
 
 ## Project status
 
-Arcade build with hyperspace, dual saucers, power-ups, and extra-life scoring.
-See `docs/superpowers/specs/` for the earlier polish design note.
+Full arcade build (phases 1–4): juice/CRT, depth mechanics, meta modes, and quality packaging.  
+Roadmap: [`docs/superpowers/specs/2026-07-30-asteroids-four-phase-roadmap.md`](docs/superpowers/specs/2026-07-30-asteroids-four-phase-roadmap.md).
 
 ---
 
