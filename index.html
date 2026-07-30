@@ -2972,100 +2972,205 @@
             controlsHelp.setAttribute('aria-hidden', show ? 'false' : 'true');
         }
 
-        // Attract AI: dodge bullets → collect power-ups → fight rocks/UFOs
+        // Attract AI priority: dodge → power-up (clear rocks on path) → UFO → asteroids
         let attractFireCd = 0;
+
+        function attractAngleDiff(desired) {
+            let diff = desired - ship.angle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            return diff;
+        }
+
+        function attractDist2(ax, ay, bx, by) {
+            const dx = ax - bx;
+            const dy = ay - by;
+            return dx * dx + dy * dy;
+        }
+
+        // Distance² from point P to segment A→B
+        function attractPointSegDist2(px, py, ax, ay, bx, by) {
+            const abx = bx - ax;
+            const aby = by - ay;
+            const apx = px - ax;
+            const apy = py - ay;
+            const ab2 = abx * abx + aby * aby;
+            let t = ab2 > 1e-6 ? (apx * abx + apy * aby) / ab2 : 0;
+            if (t < 0) t = 0;
+            if (t > 1) t = 1;
+            const cx = ax + abx * t;
+            const cy = ay + aby * t;
+            return attractDist2(px, py, cx, cy);
+        }
+
+        // Nearest asteroid sitting on the path toward (tx, ty)
+        function attractRockOnPath(tx, ty) {
+            const goalD2 = attractDist2(ship.x, ship.y, tx, ty);
+            let best = null;
+            let bestD2 = Infinity;
+            for (let i = 0; i < asteroids.length; i++) {
+                const a = asteroids[i];
+                const toRock = attractDist2(ship.x, ship.y, a.x, a.y);
+                // Ignore rocks clearly past the goal
+                if (toRock > goalD2 + (a.size + 30) * (a.size + 30)) continue;
+                const clear = (a.size + ship.size + 16);
+                const d2 = attractPointSegDist2(a.x, a.y, ship.x, ship.y, tx, ty);
+                if (d2 < clear * clear && toRock < bestD2) {
+                    bestD2 = toRock;
+                    best = a;
+                }
+            }
+            return best;
+        }
+
+        function attractTryFire() {
+            if (attractFireCd > 0) return;
+            if (firePlayerMissiles()) {
+                attractFireCd = ship.rapidFire > 0
+                    ? RAPID_FIRE_INTERVAL
+                    : (10 + Math.random() * 8);
+            } else {
+                attractFireCd = 2;
+            }
+        }
+
+        // Steer toward a point; optional fire when aimed. Returns angle error.
+        function attractSteerTo(tx, ty, turnRate, thrustSpeed, stopDist, mayFire) {
+            const desired = Math.atan2(ty - ship.y, tx - ship.x);
+            const diff = attractAngleDiff(desired);
+            ship.angle += Math.sign(diff) * Math.min(turnRate, Math.abs(diff));
+            const dist = Math.sqrt(attractDist2(ship.x, ship.y, tx, ty));
+            if (dist > stopDist) {
+                ship.boosting = true;
+                // Only thrust hard when roughly facing the goal
+                if (Math.abs(diff) < 0.9) {
+                    ship.vx += Math.cos(ship.angle) * thrustSpeed;
+                    ship.vy += Math.sin(ship.angle) * thrustSpeed;
+                }
+            } else {
+                ship.boosting = false;
+            }
+            if (mayFire && Math.abs(diff) < 0.32) {
+                attractTryFire();
+            }
+            return diff;
+        }
+
         function updateAttractAI(f) {
             attractFireCd -= f;
+            ship.boosting = false;
 
-            // 1) Dodge nearby enemy shots
+            // 0) Dodge nearby enemy shots
             for (let i = 0; i < alienMissiles.length; i++) {
                 const m = alienMissiles[i];
-                const d = (m.x - ship.x) * (m.x - ship.x) + (m.y - ship.y) * (m.y - ship.y);
-                if (d < 55 * 55) {
+                if (attractDist2(ship.x, ship.y, m.x, m.y) < 55 * 55) {
                     const flee = Math.atan2(ship.y - m.y, ship.x - m.x);
-                    let diff = flee - ship.angle;
-                    while (diff > Math.PI) diff -= Math.PI * 2;
-                    while (diff < -Math.PI) diff += Math.PI * 2;
-                    ship.angle += Math.sign(diff) * Math.min(0.15 * f, Math.abs(diff));
+                    const diff = attractAngleDiff(flee);
+                    ship.angle += Math.sign(diff) * Math.min(0.16 * f, Math.abs(diff));
                     ship.boosting = true;
-                    ship.vx += Math.cos(ship.angle) * 0.28 * f;
-                    ship.vy += Math.sin(ship.angle) * 0.28 * f;
+                    ship.vx += Math.cos(ship.angle) * 0.3 * f;
+                    ship.vy += Math.sin(ship.angle) * 0.3 * f;
                     return;
                 }
             }
 
-            // 2) Prefer collecting power-ups (including still in grace delay)
+            // 1) PRIORITY: power-ups — clear rocks on the path (shoot or slide around)
             let powerTarget = null;
             let powerBest = Infinity;
             for (let i = 0; i < powerups.length; i++) {
                 const p = powerups[i];
-                const d = (p.x - ship.x) * (p.x - ship.x) + (p.y - ship.y) * (p.y - ship.y);
+                const d = attractDist2(ship.x, ship.y, p.x, p.y);
                 if (d < powerBest) {
                     powerBest = d;
                     powerTarget = p;
                 }
             }
             if (powerTarget) {
-                const desired = Math.atan2(powerTarget.y - ship.y, powerTarget.x - ship.x);
-                let diff = desired - ship.angle;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                ship.angle += Math.sign(diff) * Math.min(0.16 * f, Math.abs(diff));
-                const dist = Math.sqrt(powerBest);
-                // Always push toward pickup until very close
-                if (dist > 18) {
-                    ship.boosting = true;
-                    ship.vx += Math.cos(ship.angle) * 0.32 * f;
-                    ship.vy += Math.sin(ship.angle) * 0.32 * f;
+                const blocker = attractRockOnPath(powerTarget.x, powerTarget.y);
+                if (blocker) {
+                    const bDist = Math.sqrt(attractDist2(ship.x, ship.y, blocker.x, blocker.y));
+                    const aimBlock = Math.atan2(blocker.y - ship.y, blocker.x - ship.x);
+                    const aimDiff = attractAngleDiff(aimBlock);
+                    // Close rock: strafe around while still biasing toward the pickup
+                    if (bDist < blocker.size + 50) {
+                        const away = Math.atan2(ship.y - blocker.y, ship.x - blocker.x);
+                        const toPu = Math.atan2(powerTarget.y - ship.y, powerTarget.x - ship.x);
+                        // Blend flee + goal (~60% around, 40% to power-up)
+                        const bx = Math.cos(away) * 0.65 + Math.cos(toPu) * 0.35;
+                        const by = Math.sin(away) * 0.65 + Math.sin(toPu) * 0.35;
+                        const blend = Math.atan2(by, bx);
+                        const diff = attractAngleDiff(blend);
+                        ship.angle += Math.sign(diff) * Math.min(0.18 * f, Math.abs(diff));
+                        ship.boosting = true;
+                        ship.vx += Math.cos(ship.angle) * 0.34 * f;
+                        ship.vy += Math.sin(ship.angle) * 0.34 * f;
+                        // Shoot if roughly facing the rock
+                        if (Math.abs(aimDiff) < 0.45) attractTryFire();
+                    } else {
+                        // Farther rock on path: turn and shoot it clear
+                        ship.angle += Math.sign(aimDiff) * Math.min(0.16 * f, Math.abs(aimDiff));
+                        if (Math.abs(aimDiff) < 0.5) {
+                            ship.boosting = bDist > blocker.size + 70;
+                            if (ship.boosting) {
+                                ship.vx += Math.cos(ship.angle) * 0.2 * f;
+                                ship.vy += Math.sin(ship.angle) * 0.2 * f;
+                            }
+                            attractTryFire();
+                        } else {
+                            ship.boosting = false;
+                        }
+                    }
                 } else {
-                    ship.boosting = false;
+                    // Clear path — go collect (no shooting at the power-up)
+                    attractSteerTo(
+                        powerTarget.x, powerTarget.y,
+                        0.17 * f, 0.34 * f, 16, false
+                    );
                 }
-                // Do not shoot while hunting power-ups
                 return;
             }
 
-            // 3) Fight nearest rock / UFO
-            let target = null;
-            let best = Infinity;
+            // 2) PRIORITY: UFO
+            if (alienShip) {
+                const blocker = attractRockOnPath(alienShip.x, alienShip.y);
+                if (blocker && attractDist2(ship.x, ship.y, blocker.x, blocker.y) <
+                    attractDist2(ship.x, ship.y, alienShip.x, alienShip.y)) {
+                    // Rock between us and saucer — clear it first
+                    attractSteerTo(blocker.x, blocker.y, 0.15 * f, 0.24 * f, blocker.size + 40, true);
+                } else {
+                    const dist = Math.sqrt(attractDist2(ship.x, ship.y, alienShip.x, alienShip.y));
+                    // Keep medium range and fire
+                    attractSteerTo(
+                        alienShip.x, alienShip.y,
+                        0.15 * f, 0.26 * f,
+                        dist < 120 ? 9999 : 100, // don't ram if already close
+                        true
+                    );
+                    if (dist < 140) ship.boosting = false;
+                }
+                return;
+            }
+
+            // 3) Asteroids last
+            let rock = null;
+            let rockBest = Infinity;
             for (let i = 0; i < asteroids.length; i++) {
                 const a = asteroids[i];
-                const d = (a.x - ship.x) * (a.x - ship.x) + (a.y - ship.y) * (a.y - ship.y);
-                if (d < best) {
-                    best = d;
-                    target = a;
+                const d = attractDist2(ship.x, ship.y, a.x, a.y);
+                if (d < rockBest) {
+                    rockBest = d;
+                    rock = a;
                 }
             }
-            if (alienShip) {
-                const d = (alienShip.x - ship.x) * (alienShip.x - ship.x) +
-                    (alienShip.y - ship.y) * (alienShip.y - ship.y);
-                if (d < best) {
-                    target = alienShip;
-                    best = d;
-                }
-            }
-            if (target) {
-                const desired = Math.atan2(target.y - ship.y, target.x - ship.x);
-                let diff = desired - ship.angle;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                ship.angle += Math.sign(diff) * Math.min(0.14 * f, Math.abs(diff));
-                const dist = Math.sqrt(best);
-                if (dist > 90) {
-                    ship.boosting = true;
-                    ship.vx += Math.cos(ship.angle) * 0.26 * f;
-                    ship.vy += Math.sin(ship.angle) * 0.26 * f;
-                } else {
-                    ship.boosting = false;
-                }
-                if (attractFireCd <= 0 && Math.abs(diff) < 0.35) {
-                    if (firePlayerMissiles()) {
-                        attractFireCd = ship.rapidFire > 0
-                            ? RAPID_FIRE_INTERVAL
-                            : (12 + Math.random() * 10);
-                    } else {
-                        attractFireCd = 2;
-                    }
-                }
+            if (rock) {
+                const dist = Math.sqrt(rockBest);
+                attractSteerTo(
+                    rock.x, rock.y,
+                    0.14 * f, 0.26 * f,
+                    dist < 85 ? 9999 : 95,
+                    true
+                );
+                if (dist < 85) ship.boosting = false;
             } else {
                 ship.boosting = false;
             }
