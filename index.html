@@ -118,11 +118,12 @@
             overflow: visible;
         }
 
-        /* Soft cone of light (wide at the bottom, fades out) — unchanged */
+        /* Soft cone of light (wide at the bottom, fades out) */
         .lamp::before {
             content: '';
             position: absolute;
-            top: 90%;
+            /* Start under the bulb so the cone doesn’t spill past the fixture */
+            top: 100%;
             left: 50%;
             transform: translateX(-50%);
             width: 300px;
@@ -136,15 +137,18 @@
                 rgba(255, 200, 110, 0.015) 72%,
                 transparent 100%
             );
-            /* Trapezoid = soft spotlight cone */
-            clip-path: polygon(40% 0%, 60% 0%, 100% 100%, 0% 100%);
+            /*
+             * Top aperture narrower than the bright bulb; blur expands the edge
+             * so a tight top (~12%) still reads as matching the fixture.
+             */
+            clip-path: polygon(44% 0%, 56% 0%, 100% 100%, 0% 100%);
             filter: blur(14px);
             opacity: 0.9;
             pointer-events: none;
             z-index: -1;
         }
 
-        /* Bright bulb — wider to match cone entrance (40–60% of 300px ≈ 60px) */
+        /* Bright bulb — wider to match cone entrance */
         .lamp::after {
             content: '';
             position: absolute;
@@ -164,11 +168,12 @@
         .lamp-b { left: 50%; transform: translateX(-50%); }
         .lamp-c { right: 18%; left: auto; }
 
-        /* Middle lamp slightly stronger / longer cone — unchanged */
+        /* Middle lamp: same cone strength, tighter top (wider base needs narrower %) */
         .lamp-b::before {
             width: 340px;
             height: min(78vh, 700px);
             opacity: 1;
+            clip-path: polygon(46% 0%, 54% 0%, 100% 100%, 0% 100%);
             background: linear-gradient(
                 180deg,
                 rgba(255, 240, 205, 0.42) 0%,
