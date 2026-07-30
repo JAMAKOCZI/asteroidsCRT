@@ -98,25 +98,26 @@
                 radial-gradient(ellipse 35% 25% at 80% 65%, rgba(0,0,0,0.1), transparent);
         }
 
-        /* Ceiling plate + structural I-beams */
+        /* Ceiling plate + structural I-beam */
         .hangar-ceiling {
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
-            height: 20%;
+            height: 22%;
             pointer-events: none;
             background:
                 linear-gradient(180deg, rgba(12, 12, 11, 0.85) 0%, rgba(28, 28, 26, 0.45) 40%, transparent 100%);
-            z-index: 1;
+            z-index: 2;
+            overflow: visible;
         }
 
-        /* Single full-width ceiling beam that carries the lamps */
+        /* Single full-width beam — lamps hang from its underside */
         .hangar-ceiling .beam {
             position: absolute;
             left: 0;
             right: 0;
-            top: 10%;
+            top: 36px;
             height: 18px;
             background:
                 linear-gradient(180deg, #4a4c48 0%, #2e302c 35%, #1a1c18 100%);
@@ -124,6 +125,8 @@
                 0 8px 16px rgba(0, 0, 0, 0.5),
                 inset 0 1px 0 rgba(255, 255, 255, 0.08);
             border-radius: 0;
+            overflow: visible;
+            z-index: 2;
         }
 
         /* I-beam flanges */
@@ -274,12 +277,16 @@
             100% { transform: translate(-8px, -80px); opacity: 0; }
         }
 
-        /* Hanging industrial fixtures + soft downward light cones */
+        /*
+         * Lamps are children of .beam — hang from underside via short stem.
+         * Cones move with the fixtures.
+         */
         .lamp {
             --bulb-w: 56px;
             --cone-w: 300px;
             position: absolute;
-            top: 11%;
+            top: 100%;
+            margin-top: 10px; /* stem length from beam bottom flange */
             width: 72px;
             height: 40px;
             border-radius: 6px 6px 44% 44%;
@@ -290,17 +297,17 @@
                 inset 0 2px 0 rgba(255, 255, 255, 0.1),
                 inset 0 -2px 4px rgba(0, 0, 0, 0.5),
                 0 2px 4px rgba(0, 0, 0, 0.4);
-            z-index: 2;
+            z-index: 3;
             overflow: visible;
         }
 
-        /* Mount stem to ceiling beam */
+        /* Mount stem from beam down into fixture */
         .lamp .stem {
             position: absolute;
             left: 50%;
             bottom: 100%;
             width: 6px;
-            height: 22px;
+            height: 14px; /* reaches up into the beam flange */
             transform: translateX(-50%);
             background: linear-gradient(90deg, #2a2a28, #4a4a46, #2a2a28);
             box-shadow: 0 0 2px rgba(0,0,0,0.5);
@@ -310,8 +317,8 @@
             content: '';
             position: absolute;
             left: 50%;
-            top: -4px;
-            width: 14px;
+            top: -3px;
+            width: 16px;
             height: 6px;
             transform: translateX(-50%);
             background: #3a3a36;
@@ -1117,15 +1124,16 @@
 <body>
     <div class="hangar">
         <div class="hangar-ceiling" aria-hidden="true">
-            <div class="beam"></div>
+            <div class="beam">
+                <div class="lamp lamp-a"><span class="stem"></span></div>
+                <div class="lamp lamp-b"><span class="stem"></span></div>
+                <div class="lamp lamp-c"><span class="stem"></span></div>
+            </div>
         </div>
         <div class="hangar-pipe hangar-pipe-v" aria-hidden="true"></div>
         <div class="hangar-pipe hangar-pipe-v2" aria-hidden="true"></div>
         <div class="hangar-pipe hangar-pipe-h" aria-hidden="true"></div>
         <div class="hangar-ebox" aria-hidden="true"></div>
-        <div class="lamp lamp-a" aria-hidden="true"><span class="stem"></span></div>
-        <div class="lamp lamp-b" aria-hidden="true"><span class="stem"></span></div>
-        <div class="lamp lamp-c" aria-hidden="true"><span class="stem"></span></div>
         <div class="hangar-floor" aria-hidden="true"></div>
         <div class="hangar-haze" aria-hidden="true"></div>
         <div class="hangar-dust" aria-hidden="true">
