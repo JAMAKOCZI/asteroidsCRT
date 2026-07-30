@@ -32,7 +32,7 @@
             min-height: 100vh;
             width: 100%;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: center;
             position: relative;
             overflow: hidden;
@@ -142,8 +142,9 @@
         }
 
         /*
-         * One assembly: CRT base sits flush on desk top edge (document flow).
-         * Desk is nearly full viewport width; legs hang past the bottom edge.
+         * Assembly: CRT (native 800×600 screen, no default downscale) centered
+         * in the viewport; desk under the base; legs out of flow so they don't
+         * shift vertical centering.
          */
         .assembly {
             position: relative;
@@ -153,39 +154,56 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* Legs extend outside the viewport */
-            margin-bottom: calc(-1 * min(38vh, 280px));
             pointer-events: none;
+            /*
+             * Desk top+apron (~96px) sits below the CRT. Shift the stack down by
+             * half of that so the game screen stays optically centered.
+             */
+            transform: translateY(48px);
         }
 
         .assembly .crt-computer {
             pointer-events: auto;
         }
 
-        /* —— CRT: scale from base so feet stay planted on the desk —— */
+        /* Full original screen size (800×600 canvas + bezel) — no forced shrink */
         .crt-computer {
             position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
             z-index: 6;
-            transform: scale(0.86);
-            transform-origin: bottom center;
-            /* Overlap 1px so base sits ON the top edge, not floating */
+            transform: none;
             margin-bottom: -1px;
         }
 
-        @media (max-width: 1100px) {
-            .crt-computer { transform: scale(0.72); }
+        /*
+         * Only scale when the viewport is too small to fit the full CRT.
+         * Origin at bottom so the base stays on the desk.
+         */
+        @media (max-width: 920px) {
+            .crt-computer {
+                transform: scale(0.9);
+                transform-origin: bottom center;
+            }
         }
-        @media (max-width: 900px) {
-            .crt-computer { transform: scale(0.56); }
+        @media (max-width: 800px) {
+            .crt-computer {
+                transform: scale(0.75);
+                transform-origin: bottom center;
+            }
         }
-        @media (max-height: 800px) {
-            .crt-computer { transform: scale(0.7); }
+        @media (max-height: 820px) {
+            .crt-computer {
+                transform: scale(0.9);
+                transform-origin: bottom center;
+            }
         }
-        @media (max-height: 650px) {
-            .crt-computer { transform: scale(0.54); }
+        @media (max-height: 700px) {
+            .crt-computer {
+                transform: scale(0.75);
+                transform-origin: bottom center;
+            }
         }
 
         .desk {
@@ -259,12 +277,15 @@
             background: linear-gradient(270deg, rgba(0,0,0,0.35), transparent);
         }
 
+        /* Legs out of layout flow — hang past the bottom of the viewport */
         .desk-legs {
+            position: absolute;
+            left: 3%;
+            right: 3%;
+            top: 100%;
             display: flex;
             justify-content: space-between;
-            width: 94%;
-            height: min(48vh, 360px);
-            margin-top: 0;
+            height: 50vh;
             pointer-events: none;
             z-index: 1;
         }
