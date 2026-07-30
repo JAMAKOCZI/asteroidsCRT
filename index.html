@@ -126,17 +126,43 @@
         const leaderboardList = document.getElementById('leaderboardList');
         const restartPrompt = document.getElementById('restartPrompt');
 
+        // localStorage helpers (private mode / quota can throw)
+        function loadLeaderboard() {
+            try {
+                const data = JSON.parse(localStorage.getItem('asteroidsLeaderboard') || '[]');
+                return Array.isArray(data) ? data : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveLeaderboard(entries) {
+            try {
+                localStorage.setItem('asteroidsLeaderboard', JSON.stringify(entries));
+            } catch (e) {
+                // Ignore write failures (quota / private mode)
+            }
+        }
+
+        function qualifiesForHighScore(score) {
+            if (score <= 0) return false;
+            const board = gameState.leaderboard;
+            if (board.length < 10) return true;
+            return score > board[board.length - 1].score;
+        }
+
         // Game state
         let gameState = {
             lives: 3,
             score: 0,
             level: 1,
             gameOver: false,
-            won: false,
             enteringInitials: false,
             initials: '',
-            leaderboard: JSON.parse(localStorage.getItem('asteroidsLeaderboard') || '[]')
+            leaderboard: loadLeaderboard()
         };
+
+        const MAX_SHIP_SPEED = 8;
 
         // Input handling
         const keys = {};
@@ -306,14 +332,15 @@
             return distance < radius1 + radius2;
         }
 
-        // Break asteroid into smaller pieces
+        // Break asteroid into smaller pieces (returns new rocks; caller adds them)
         function breakAsteroid(asteroid) {
+            const pieces = [];
             if (asteroid.size > 15) {
                 const newSize = asteroid.size / 2;
                 const speedMultiplier = Math.pow(1.1, gameState.level - 1);
                 
                 for (let i = 0; i < 2; i++) {
-                    asteroids.push({
+                    pieces.push({
                         x: asteroid.x + (Math.random() - 0.5) * 20,
                         y: asteroid.y + (Math.random() - 0.5) * 20,
                         vx: (Math.random() - 0.5) * 3 * speedMultiplier,
@@ -325,6 +352,7 @@
                 }
             }
             createParticles(asteroid.x, asteroid.y, 6);
+            return pieces;
         }
 
         // Next level
@@ -349,7 +377,7 @@
             gameState.gameOver = true;
             gameOverElement.style.display = 'block';
             
-            if (gameState.score >= 5000) {
+            if (qualifiesForHighScore(gameState.score)) {
                 gameState.enteringInitials = true;
                 gameOverText.textContent = "HIGH SCORE!";
                 initialsPrompt.style.display = 'block';
@@ -392,7 +420,7 @@
             });
             gameState.leaderboard.sort((a, b) => b.score - a.score);
             gameState.leaderboard = gameState.leaderboard.slice(0, 10); // Keep top 10
-            localStorage.setItem('asteroidsLeaderboard', JSON.stringify(gameState.leaderboard));
+            saveLeaderboard(gameState.leaderboard);
         }
 
         function showLeaderboard() {
@@ -466,6 +494,14 @@
             ship.y += ship.vy;
             ship.vx *= 0.99; // Friction
             ship.vy *= 0.99;
+
+            // Clamp ship speed so continuous boost cannot run away
+            const shipSpeed = Math.hypot(ship.vx, ship.vy);
+            if (shipSpeed > MAX_SHIP_SPEED) {
+                ship.vx = (ship.vx / shipSpeed) * MAX_SHIP_SPEED;
+                ship.vy = (ship.vy / shipSpeed) * MAX_SHIP_SPEED;
+            }
+
             wrap(ship);
             
             if (ship.invulnerable > 0) {
@@ -509,81 +545,97 @@
                 return particle.life > 0;
             });
 
-            // Check missile-asteroid collisions
-            missiles.forEach((missile, mi) => {
-                asteroids.forEach((asteroid, ai) => {
-                    if (checkCollision(missile, asteroid, 2, asteroid.size)) {
-                        // Hit score: 50 points
+            // Collisions: collect removals first (never splice mid-iteration)
+            const missilesToRemove = new Set();
+            const asteroidsToRemove = new Set();
+            const alienMissilesToRemove = new Set();
+            const splitAsteroids = [];
+            let killAlien = false;
+
+            for (let mi = 0; mi < missiles.length; mi++) {
+                if (missilesToRemove.has(mi)) continue;
+                for (let ai = 0; ai < asteroids.length; ai++) {
+                    if (asteroidsToRemove.has(ai) || missilesToRemove.has(mi)) continue;
+                    if (checkCollision(missiles[mi], asteroids[ai], 2, asteroids[ai].size)) {
                         gameState.score += 50;
-                        
-                        // Check if asteroid will be destroyed or split
-                        if (asteroid.size <= 15) {
-                            // Destroyed: additional 100 points
+                        if (asteroids[ai].size <= 15) {
                             gameState.score += 100;
                         } else {
-                            // Will split: additional 50 points
                             gameState.score += 50;
                         }
-                        
-                        breakAsteroid(asteroid);
-                        asteroids.splice(ai, 1);
-                        missiles.splice(mi, 1);
+                        const pieces = breakAsteroid(asteroids[ai]);
+                        if (pieces) splitAsteroids.push(...pieces);
+                        asteroidsToRemove.add(ai);
+                        missilesToRemove.add(mi);
                     }
-                });
-            });
+                }
+            }
 
-            // Check missile-alien ship collisions
             if (alienShip) {
-                missiles.forEach((missile, mi) => {
-                    if (checkCollision(missile, alienShip, 2, alienShip.size)) {
+                for (let mi = 0; mi < missiles.length; mi++) {
+                    if (missilesToRemove.has(mi)) continue;
+                    if (checkCollision(missiles[mi], alienShip, 2, alienShip.size)) {
                         gameState.score += 500;
                         createParticles(alienShip.x, alienShip.y, 10);
-                        alienShip = null;
-                        missiles.splice(mi, 1);
-                        
-                        // Respawn alien ship after delay
-                        setTimeout(() => {
-                            if (gameState.level >= 3 && !gameState.gameOver) {
-                                createAlienShip();
-                            }
-                        }, 5000 + Math.random() * 10000); // 5-15 seconds
+                        killAlien = true;
+                        missilesToRemove.add(mi);
+                        break;
                     }
-                });
+                }
             }
 
-            // Check ship-asteroid collisions
-            if (ship.invulnerable === 0) {
-                asteroids.forEach(asteroid => {
-                    if (checkCollision(ship, asteroid, ship.size, asteroid.size)) {
-                        gameState.lives--;
-                        createParticles(ship.x, ship.y, 12);
-                        
-                        if (gameState.lives <= 0) {
-                            endGame();
-                        } else {
-                            resetShip();
-                        }
+            if (missilesToRemove.size) {
+                missiles = missiles.filter((_, i) => !missilesToRemove.has(i));
+            }
+            if (asteroidsToRemove.size) {
+                asteroids = asteroids.filter((_, i) => !asteroidsToRemove.has(i));
+            }
+            if (splitAsteroids.length) {
+                asteroids.push(...splitAsteroids);
+            }
+            if (killAlien) {
+                alienShip = null;
+                setTimeout(() => {
+                    if (gameState.level >= 3 && !gameState.gameOver) {
+                        createAlienShip();
                     }
-                });
-
-                // Check ship-alien missile collisions
-                alienMissiles.forEach((missile, mi) => {
-                    if (checkCollision(ship, missile, ship.size, 2)) {
-                        gameState.lives--;
-                        createParticles(ship.x, ship.y, 12);
-                        alienMissiles.splice(mi, 1);
-                        
-                        if (gameState.lives <= 0) {
-                            endGame();
-                        } else {
-                            resetShip();
-                        }
-                    }
-                });
+                }, 5000 + Math.random() * 10000);
             }
 
-            // Check win condition
-            if (asteroids.length === 0 && !gameState.won) {
+            // Ship damage: at most one life lost per frame
+            let diedThisFrame = false;
+            if (ship.invulnerable === 0 && !gameState.gameOver) {
+                for (let ai = 0; ai < asteroids.length; ai++) {
+                    if (checkCollision(ship, asteroids[ai], ship.size, asteroids[ai].size)) {
+                        diedThisFrame = true;
+                        break;
+                    }
+                }
+                if (!diedThisFrame) {
+                    for (let mi = 0; mi < alienMissiles.length; mi++) {
+                        if (checkCollision(ship, alienMissiles[mi], ship.size, 2)) {
+                            alienMissilesToRemove.add(mi);
+                            diedThisFrame = true;
+                            break;
+                        }
+                    }
+                }
+                if (alienMissilesToRemove.size) {
+                    alienMissiles = alienMissiles.filter((_, i) => !alienMissilesToRemove.has(i));
+                }
+                if (diedThisFrame) {
+                    gameState.lives--;
+                    createParticles(ship.x, ship.y, 12);
+                    if (gameState.lives <= 0) {
+                        endGame();
+                    } else {
+                        resetShip();
+                    }
+                }
+            }
+
+            // Level clear
+            if (asteroids.length === 0 && !gameState.gameOver) {
                 nextLevel();
             }
 
@@ -718,10 +770,9 @@
                 score: 0,
                 level: 1,
                 gameOver: false,
-                won: false,
                 enteringInitials: false,
                 initials: '',
-                leaderboard: JSON.parse(localStorage.getItem('asteroidsLeaderboard') || '[]')
+                leaderboard: loadLeaderboard()
             };
             missiles = [];
             particles = [];
