@@ -106,10 +106,10 @@
 (stats najpierw — shared instrumentation; ghost na końcu jako advanced).
 
 **Kryterium ukończenia fazy 3**
-- [ ] Stats nie kłamią (liczniki w update/kolizjach)
-- [ ] Attract nie kradnie inputu po naciśnięciu klawisza
-- [ ] Daily seed deterministyczny w jednym dniu
-- [ ] Challenges nie psują normalnego trybu
+- [x] Stats nie kłamią (liczniki w update/kolizjach)
+- [x] Attract nie kradnie inputu po naciśnięciu klawisza
+- [x] Daily seed deterministyczny w jednym dniu
+- [x] Challenges nie psują normalnego trybu
 
 **Szacunek:** średni (RNG seed + state machine title/attract).
 

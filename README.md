@@ -19,8 +19,11 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 - Large / small / **boss** UFO saucers (boss every 5 levels)
 - Power-ups: **S**hield, **R**apid, **T**riple, **W**ide, s**L**ow field
 - Optional **Hard** mode from the title screen (`G`)
+- **Daily seed** (`D`) and **challenges** (`C`: no hyper / no power / survive 2:00)
+- Run **stats** after game over; **ghost** trail of the last run
+- **Attract mode** after idle on the title screen
 - CRT phosphor palette by level, hangar chrome, Web Audio SFX
-- High scores with initials (top 10, `localStorage`)
+- High scores with initials (top 10, separate boards per mode)
 - Title screen, pause, mute / volume
 
 ---
@@ -36,6 +39,8 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 | **P** | Pause / resume |
 | **A key** (not Tab/modifiers) | Start from title screen |
 | **G** / **1** / **2** | Toggle hard / normal / hard (title) |
+| **D** | Daily seed mode on/off (title) |
+| **C** | Cycle challenge (title) |
 | **[** **]** or **,** **.** | Cycle phosphor preview (title) |
 | **M** | Mute / unmute |
 | **−** **/** **=** | Volume down / up |

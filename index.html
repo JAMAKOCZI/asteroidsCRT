@@ -1323,17 +1323,18 @@
                                     SPACE: Fire<br>
                                     H / DOWN: Hyperspace (hold = safe)<br>
                                     P: Pause · M: Mute · −/=: Volume<br>
-                                    Title: [ ] phosphor · G: hard mode
+                                    Title: [ ] phosphor · G hard · D daily · C challenge
                                 </div>
                                 <div id="gameOver" class="game-over" style="display: none;">
                                     <div id="gameOverText">GAME OVER</div>
+                                    <div id="runStats" style="display: none; font-size: 12px; margin-top: 14px; line-height: 1.45; text-align: left; max-width: 280px; margin-left: auto; margin-right: auto;"></div>
                                     <div id="initialsPrompt" style="display: none; font-size: 16px; margin-top: 20px;">
                                         <div>HIGH SCORE! Enter your initials:</div>
                                         <div style="font-size: 24px; margin: 10px 0; letter-spacing: 4px;" id="initialsDisplay">___</div>
                                         <div style="font-size: 12px;">A–Z, Enter to save · Esc to skip</div>
                                     </div>
                                     <div id="leaderboard" style="display: none; font-size: 14px; margin-top: 20px;">
-                                        <div style="font-size: 18px; margin-bottom: 15px;">HIGH SCORES</div>
+                                        <div id="leaderboardTitle" style="font-size: 18px; margin-bottom: 15px;">HIGH SCORES</div>
                                         <div id="leaderboardList"></div>
                                     </div>
                                     <div id="restartPrompt" style="font-size: 16px; margin-top: 20px;">Press R to Restart</div>
@@ -1390,9 +1391,11 @@
         const crtScreenEl = document.querySelector('.crt-screen');
         const gameOverElement = document.getElementById('gameOver');
         const gameOverText = document.getElementById('gameOverText');
+        const runStatsEl = document.getElementById('runStats');
         const initialsPrompt = document.getElementById('initialsPrompt');
         const initialsDisplay = document.getElementById('initialsDisplay');
         const leaderboard = document.getElementById('leaderboard');
+        const leaderboardTitle = document.getElementById('leaderboardTitle');
         const leaderboardList = document.getElementById('leaderboardList');
         const restartPrompt = document.getElementById('restartPrompt');
 
@@ -1407,6 +1410,18 @@
         const COMBO_WINDOW = 110; // frames to keep chain alive
         const COMBO_MAX_MULT = 5;
         const BOSS_LEVEL_INTERVAL = 5;
+        const ATTRACT_IDLE_SEC = 28;
+        const SURVIVE_GOAL_SEC = 120;
+        const GHOST_STORAGE_KEY = 'asteroidsGhostTrail';
+        const GHOST_SAMPLE_SEC = 0.1;
+        const GHOST_MAX_POINTS = 500;
+
+        const CHALLENGE_OPTS = [
+            { id: 'none', label: 'NONE' },
+            { id: 'nohs', label: 'NO HYPER' },
+            { id: 'nopu', label: 'NO POWER' },
+            { id: 'survive', label: 'SURVIVE 2:00' }
+        ];
 
         // Classic CRT phosphor palette — cycles every 8 levels
         const CRT_PHOSPHORS = [
@@ -1518,10 +1533,70 @@
             return 'rgba(' + crtTheme.r + ',' + crtTheme.g + ',' + crtTheme.b + ',' + alpha + ')';
         }
 
-        // --- localStorage ---
-        function loadLeaderboard() {
+        // --- Seeded RNG (daily) / gameplay uses rnd(); SFX keep Math.random ---
+        function mulberry32(seed) {
+            let a = seed >>> 0;
+            return function () {
+                a |= 0;
+                a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function hashString32(str) {
+            let h = 2166136261;
+            const s = String(str);
+            for (let i = 0; i < s.length; i++) {
+                h ^= s.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return h >>> 0;
+        }
+
+        function utcDayId() {
+            const d = new Date();
+            const y = d.getUTCFullYear();
+            const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(d.getUTCDate()).padStart(2, '0');
+            return '' + y + m + day;
+        }
+
+        let rngFn = Math.random;
+        function setRngSeed(seed) {
+            if (seed == null || seed === false) {
+                rngFn = Math.random;
+            } else {
+                rngFn = mulberry32(seed >>> 0);
+            }
+        }
+        function rnd() {
+            return rngFn();
+        }
+
+        function seedRunLevel(level) {
+            if (!gameState.daily || !gameState.dailySeed) {
+                setRngSeed(null);
+                return;
+            }
+            setRngSeed(hashString32(gameState.dailySeed + '-L' + level));
+        }
+
+        // --- localStorage leaderboards (per mode) ---
+        function leaderboardKeyFor(meta) {
+            meta = meta || {};
+            if (meta.daily) return 'asteroidsLeaderboardDaily-' + (meta.dayId || utcDayId());
+            if (meta.challenge === 'nohs') return 'asteroidsLB-ch-nohs';
+            if (meta.challenge === 'nopu') return 'asteroidsLB-ch-nopu';
+            if (meta.challenge === 'survive') return 'asteroidsLB-ch-survive';
+            return 'asteroidsLeaderboard';
+        }
+
+        function loadLeaderboard(storageKey) {
             try {
-                const data = JSON.parse(localStorage.getItem('asteroidsLeaderboard') || '[]');
+                const key = storageKey || 'asteroidsLeaderboard';
+                const data = JSON.parse(localStorage.getItem(key) || '[]');
                 if (!Array.isArray(data)) return [];
                 return data
                     .map(function (row) {
@@ -1542,30 +1617,139 @@
             }
         }
 
-        function saveLeaderboard(entries) {
+        function saveLeaderboard(entries, storageKey) {
             try {
-                localStorage.setItem('asteroidsLeaderboard', JSON.stringify(entries));
+                localStorage.setItem(storageKey || 'asteroidsLeaderboard', JSON.stringify(entries));
             } catch (e) { /* private mode / quota */ }
         }
 
         function qualifiesForHighScore(score) {
             if (score <= 0) return false;
+            if (gameState.isAttract) return false;
             const board = gameState.leaderboard;
             if (board.length < 10) return true;
-            // Ties with the 10th place still qualify
             return score >= board[board.length - 1].score;
         }
 
-        // Game state — mode: title | playing | paused | gameover
+        function leaderboardTitleText() {
+            if (gameState.daily) return 'DAILY ' + (gameState.dayId || utcDayId());
+            if (gameState.challenge === 'nohs') return 'CH: NO HYPER';
+            if (gameState.challenge === 'nopu') return 'CH: NO POWER';
+            if (gameState.challenge === 'survive') return 'CH: SURVIVE';
+            if (gameState.hard) return 'HIGH SCORES · HARD';
+            return 'HIGH SCORES';
+        }
+
+        // --- Run stats ---
+        function freshRunStats() {
+            return {
+                timeAlive: 0,
+                rocks: 0,
+                ufos: 0,
+                shots: 0,
+                hits: 0,
+                maxCombo: 1,
+                levelReached: 1,
+                deaths: 0
+            };
+        }
+
+        let runStats = freshRunStats();
+
+        function formatTime(sec) {
+            const s = Math.max(0, Math.floor(sec));
+            const m = Math.floor(s / 60);
+            const r = s % 60;
+            return m + ':' + (r < 10 ? '0' : '') + r;
+        }
+
+        function accuracyPct() {
+            if (runStats.shots <= 0) return 0;
+            return Math.min(100, Math.round((runStats.hits / runStats.shots) * 100));
+        }
+
+        function fillRunStatsPanel() {
+            if (!runStatsEl) return;
+            const lines = [
+                'TIME  ' + formatTime(runStats.timeAlive),
+                'LEVEL  ' + runStats.levelReached,
+                'ROCKS  ' + runStats.rocks + '   UFO  ' + runStats.ufos,
+                'SHOTS  ' + runStats.shots + '   HITS  ' + runStats.hits + '   ACC  ' + accuracyPct() + '%',
+                'MAX COMBO  x' + runStats.maxCombo + '   DEATHS  ' + runStats.deaths
+            ];
+            if (gameState.hard) lines.unshift('MODE  HARD');
+            if (gameState.daily) lines.unshift('DAILY  ' + (gameState.dayId || ''));
+            if (gameState.challenge && gameState.challenge !== 'none') {
+                lines.unshift('CHALLENGE  ' + gameState.challenge.toUpperCase());
+            }
+            runStatsEl.textContent = '';
+            lines.forEach(function (line) {
+                const div = document.createElement('div');
+                div.textContent = line;
+                runStatsEl.appendChild(div);
+            });
+            runStatsEl.style.display = 'block';
+        }
+
+        // --- Ghost trail ---
+        let ghostTrail = [];
+        let recordingTrail = [];
+        let ghostSampleAcc = 0;
+
+        function loadGhostTrail() {
+            try {
+                const raw = localStorage.getItem(GHOST_STORAGE_KEY);
+                if (!raw) return [];
+                const data = JSON.parse(raw);
+                if (!Array.isArray(data)) return [];
+                return data.filter(function (p) {
+                    return p && Number.isFinite(p.x) && Number.isFinite(p.y);
+                }).slice(0, GHOST_MAX_POINTS);
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveGhostTrail(trail) {
+            try {
+                localStorage.setItem(GHOST_STORAGE_KEY, JSON.stringify(trail.slice(-GHOST_MAX_POINTS)));
+            } catch (e) { /* ignore */ }
+        }
+
+        function sampleGhostPoint(dt) {
+            if (gameState.isAttract || gameState.mode !== 'playing') return;
+            ghostSampleAcc += dt;
+            if (ghostSampleAcc < GHOST_SAMPLE_SEC) return;
+            ghostSampleAcc = 0;
+            recordingTrail.push({
+                x: Math.round(ship.x),
+                y: Math.round(ship.y),
+                a: Math.round(ship.angle * 100) / 100
+            });
+            if (recordingTrail.length > GHOST_MAX_POINTS) {
+                recordingTrail = recordingTrail.slice(-GHOST_MAX_POINTS);
+            }
+        }
+
+        // Game state — mode: title | playing | paused | gameover | attract
         let gameState = {
             mode: 'title',
             lives: 3,
             score: 0,
             level: 1,
+            hard: false,
+            daily: false,
+            dayId: '',
+            dailySeed: 0,
+            challenge: 'none',
+            isAttract: false,
+            cleared: false,
+            bossSpawnedThisLevel: false,
             gameOver: false,
             enteringInitials: false,
             initials: '',
             leaderboard: loadLeaderboard(),
+            leaderboardKey: 'asteroidsLeaderboard',
             nextExtraLife: EXTRA_LIFE_EVERY,
             message: '',
             messageTimer: 0
@@ -1915,8 +2099,17 @@
                 return;
             }
 
+            // Attract: any real key returns to title (does not auto-start on that key)
+            if (gameState.mode === 'attract') {
+                if (isModifierOnlyOrBrowserChord(e)) return;
+                e.preventDefault();
+                exitAttractToTitle();
+                return;
+            }
+
             if (gameState.mode === 'title') {
                 if (isModifierOnlyOrBrowserChord(e)) return;
+                titleIdleSec = 0;
                 // Phosphor preview — does not start the run
                 if (e.code === 'BracketLeft' || e.code === 'Comma') {
                     e.preventDefault();
@@ -1946,6 +2139,20 @@
                 }
                 if (e.code === 'Digit2' || e.code === 'Numpad2') {
                     titleHardMode = true;
+                    sfxUiBlip();
+                    return;
+                }
+                // Daily seed toggle
+                if (e.code === 'KeyD') {
+                    e.preventDefault();
+                    titleDaily = !titleDaily;
+                    sfxUiBlip();
+                    return;
+                }
+                // Challenge cycle
+                if (e.code === 'KeyC') {
+                    e.preventDefault();
+                    titleChallengeIndex = (titleChallengeIndex + 1) % CHALLENGE_OPTS.length;
                     sfxUiBlip();
                     return;
                 }
@@ -1996,10 +2203,10 @@
 
         // --- Entities ---
         function makeAsteroidVertices(size) {
-            const points = 8 + Math.floor(Math.random() * 5);
+            const points = 8 + Math.floor(rnd() * 5);
             const radii = [];
             for (let i = 0; i < points; i++) {
-                radii.push(size * (0.7 + Math.random() * 0.4));
+                radii.push(size * (0.7 + rnd() * 0.4));
             }
             return radii;
         }
@@ -2009,11 +2216,11 @@
             return {
                 x: x,
                 y: y,
-                vx: (Math.random() - 0.5) * scale * speedMultiplier,
-                vy: (Math.random() - 0.5) * scale * speedMultiplier,
+                vx: (rnd() - 0.5) * scale * speedMultiplier,
+                vy: (rnd() - 0.5) * scale * speedMultiplier,
                 size: size,
-                rotation: Math.random() * Math.PI * 2,
-                rotationSpeed: (Math.random() - 0.5) * 0.1 * speedMultiplier * (scale > 2 ? 2 : 1),
+                rotation: rnd() * Math.PI * 2,
+                rotationSpeed: (rnd() - 0.5) * 0.1 * speedMultiplier * (scale > 2 ? 2 : 1),
                 vertices: makeAsteroidVertices(size)
             };
         }
@@ -2046,9 +2253,22 @@
 
         // Title selection (applied when a run starts)
         let titleHardMode = false;
+        let titleDaily = false;
+        let titleChallengeIndex = 0;
+        let titleIdleSec = 0;
 
         // Combo chain: kills within COMBO_WINDOW raise multiplier (cap COMBO_MAX_MULT)
         let combo = { count: 0, mult: 1, timer: 0, best: 1 };
+
+        function currentChallengeId() {
+            return CHALLENGE_OPTS[titleChallengeIndex]
+                ? CHALLENGE_OPTS[titleChallengeIndex].id
+                : 'none';
+        }
+
+        function isRealPlay() {
+            return gameState.mode === 'playing' && !gameState.isAttract;
+        }
 
         // --- Scoring / messages ---
         function showMessage(text, frames) {
@@ -2072,6 +2292,7 @@
             // kills 1→×1, 2–3→×2, 4–5→×3, 6–7→×4, 8+→×5
             combo.mult = Math.min(COMBO_MAX_MULT, 1 + Math.floor(combo.count / 2));
             if (combo.mult > combo.best) combo.best = combo.mult;
+            if (combo.best > runStats.maxCombo) runStats.maxCombo = combo.best;
         }
 
         function tickCombo(f) {
@@ -2111,12 +2332,12 @@
         }
 
         function pickAlienEdge() {
-            const side = Math.floor(Math.random() * 4);
+            const side = Math.floor(rnd() * 4);
             switch (side) {
-                case 0: return { x: 0, y: Math.random() * canvas.height };
-                case 1: return { x: canvas.width, y: Math.random() * canvas.height };
-                case 2: return { x: Math.random() * canvas.width, y: 0 };
-                default: return { x: Math.random() * canvas.width, y: canvas.height };
+                case 0: return { x: 0, y: rnd() * canvas.height };
+                case 1: return { x: canvas.width, y: rnd() * canvas.height };
+                case 2: return { x: rnd() * canvas.width, y: 0 };
+                default: return { x: rnd() * canvas.width, y: canvas.height };
             }
         }
 
@@ -2157,7 +2378,7 @@
 
             // Small hunts harder; large is sloppier but bulkier
             const smallChance = Math.min(0.15 + gameState.level * 0.06 + (hard ? 0.1 : 0), 0.7);
-            const isSmall = gameState.level >= 4 && Math.random() < smallChance;
+            const isSmall = gameState.level >= 4 && rnd() < smallChance;
 
             alienShip = {
                 x: edge.x,
@@ -2193,7 +2414,7 @@
             const scale = gameState.hard ? 0.72 : 1;
             const minF = (minMs * scale / 1000) * TARGET_FPS;
             const maxF = (maxMs * scale / 1000) * TARGET_FPS;
-            alienSpawnTimer = minF + Math.random() * (maxF - minF);
+            alienSpawnTimer = minF + rnd() * (maxF - minF);
         }
 
         function tickAlienSpawn(f) {
@@ -2230,14 +2451,14 @@
                 let randomOffset;
                 if (t === 'boss') {
                     // Boss weaves across the field more than it dives straight in
-                    randomOffset = (Math.random() - 0.5) * Math.PI * 0.55;
-                    alienShip.changeDirection = 28 + Math.random() * 24;
+                    randomOffset = (rnd() - 0.5) * Math.PI * 0.55;
+                    alienShip.changeDirection = 28 + rnd() * 24;
                 } else if (t === 'small') {
-                    randomOffset = (Math.random() - 0.5) * Math.PI * 0.18;
-                    alienShip.changeDirection = 36 + Math.random() * 28;
+                    randomOffset = (rnd() - 0.5) * Math.PI * 0.18;
+                    alienShip.changeDirection = 36 + rnd() * 28;
                 } else {
-                    randomOffset = (Math.random() - 0.5) * Math.PI * 0.5;
-                    alienShip.changeDirection = 55 + Math.random() * 40;
+                    randomOffset = (rnd() - 0.5) * Math.PI * 0.5;
+                    alienShip.changeDirection = 55 + rnd() * 40;
                 }
                 const angle = targetAngle + randomOffset;
                 alienShip.vx = Math.cos(angle) * alienShip.speed;
@@ -2262,14 +2483,14 @@
                 const base = Math.atan2(dy, dx);
                 const jitter = alienShip.aimJitter * Math.PI;
                 if (t === 'boss') {
-                    const a0 = base + (Math.random() - 0.5) * jitter;
+                    const a0 = base + (rnd() - 0.5) * jitter;
                     fireAlienBullet(a0 - 0.18, 4.6, 150);
                     fireAlienBullet(a0, 4.8, 150);
                     fireAlienBullet(a0 + 0.18, 4.6, 150);
                 } else if (t === 'small') {
-                    fireAlienBullet(base + (Math.random() - 0.5) * jitter, 5.3, 130);
+                    fireAlienBullet(base + (rnd() - 0.5) * jitter, 5.3, 130);
                 } else {
-                    fireAlienBullet(base + (Math.random() - 0.5) * jitter, 3.8, 130);
+                    fireAlienBullet(base + (rnd() - 0.5) * jitter, 3.8, 130);
                 }
                 alienShip.lastShot = 0;
             }
@@ -2286,8 +2507,8 @@
             for (let i = 0; i < asteroidCount; i++) {
                 let x, y;
                 do {
-                    x = Math.random() * canvas.width;
-                    y = Math.random() * canvas.height;
+                    x = rnd() * canvas.width;
+                    y = rnd() * canvas.height;
                 } while (Math.sqrt((x - ship.x) ** 2 + (y - ship.y) ** 2) < (hard ? 140 : 120));
 
                 asteroids.push(makeAsteroid(x, y, 40, speedMultiplier, 2));
@@ -2348,33 +2569,34 @@
                 const speedMultiplier = Math.pow(1.12, gameState.level - 1);
                 for (let i = 0; i < 2; i++) {
                     const piece = makeAsteroid(
-                        asteroid.x + (Math.random() - 0.5) * 20,
-                        asteroid.y + (Math.random() - 0.5) * 20,
+                        asteroid.x + (rnd() - 0.5) * 20,
+                        asteroid.y + (rnd() - 0.5) * 20,
                         newSize,
                         speedMultiplier,
                         3
                     );
-                    piece.rotationSpeed = (Math.random() - 0.5) * 0.2 * speedMultiplier;
+                    piece.rotationSpeed = (rnd() - 0.5) * 0.2 * speedMultiplier;
                     pieces.push(piece);
                 }
             }
             createParticles(asteroid.x, asteroid.y, 6);
 
             // Chance to drop power-up from larger rocks
-            if (asteroid.size > 20 && Math.random() < 0.14) {
+            if (gameState.challenge !== 'nopu' && asteroid.size > 20 && rnd() < 0.14) {
                 spawnPowerup(asteroid.x, asteroid.y);
             }
             return pieces;
         }
 
         function spawnPowerup(x, y) {
+            if (gameState.challenge === 'nopu' || gameState.isAttract) return;
             const types = ['shield', 'rapid', 'triple', 'wide', 'slow'];
             powerups.push({
                 x: x,
                 y: y,
-                vx: (Math.random() - 0.5) * 1.2,
-                vy: (Math.random() - 0.5) * 1.2,
-                type: types[Math.floor(Math.random() * types.length)],
+                vx: (rnd() - 0.5) * 1.2,
+                vy: (rnd() - 0.5) * 1.2,
+                type: types[Math.floor(rnd() * types.length)],
                 life: 420,
                 size: 10
             });
@@ -2419,6 +2641,7 @@
                 angles = [ship.angle];
             }
 
+            let fired = 0;
             for (let i = 0; i < angles.length; i++) {
                 if (missiles.length >= maxM) break;
                 missiles.push(createMissile(
@@ -2426,27 +2649,33 @@
                     ship.y + Math.sin(angles[i]) * 12,
                     angles[i]
                 ));
+                fired++;
             }
-            sfxShoot();
+            if (fired > 0) {
+                if (isRealPlay()) runStats.shots += fired;
+                sfxShoot();
+            }
         }
 
         function findSafeHyperspaceSpot() {
             for (let i = 0; i < 56; i++) {
-                const x = Math.random() * canvas.width;
-                const y = Math.random() * canvas.height;
+                const x = rnd() * canvas.width;
+                const y = rnd() * canvas.height;
                 if (!positionIsDangerous(x, y)) return { x: x, y: y };
             }
-            // Fallback: canvas center if clear, else any random (still "safer" attempt)
             if (!positionIsDangerous(canvas.width / 2, canvas.height / 2)) {
                 return { x: canvas.width / 2, y: canvas.height / 2 };
             }
-            return { x: Math.random() * canvas.width, y: Math.random() * canvas.height };
+            return { x: rnd() * canvas.width, y: rnd() * canvas.height };
         }
 
         // safe: true = hold-charge jump (long CD, seeks clear space)
         // safe: false = tap (classic risk)
         function tryHyperspace(safe) {
-            if (ship.hyperspaceCooldown > 0 || gameState.mode !== 'playing') return;
+            if (ship.hyperspaceCooldown > 0) return;
+            if (gameState.mode !== 'playing' && gameState.mode !== 'attract') return;
+            if (gameState.challenge === 'nohs') return;
+            if (gameState.isAttract) return;
 
             createParticles(ship.x, ship.y, 14);
             sfxHyperspace();
@@ -2466,8 +2695,8 @@
                 createParticles(ship.x, ship.y, 12);
                 showMessage('SAFE HS', 40);
             } else {
-                ship.x = Math.random() * canvas.width;
-                ship.y = Math.random() * canvas.height;
+                ship.x = rnd() * canvas.width;
+                ship.y = rnd() * canvas.height;
                 ship.hyperspaceCooldown = HYPERSPACE_COOLDOWN;
                 if (positionIsDangerous(ship.x, ship.y)) {
                     createParticles(ship.x, ship.y, 16);
@@ -2480,9 +2709,8 @@
         }
 
         function killShip() {
-            gameState.lives--;
             createParticles(ship.x, ship.y, 14);
-            sfxDeath();
+            if (!gameState.isAttract) sfxDeath();
             ship.rapidFire = 0;
             ship.tripleShot = 0;
             ship.wideShot = 0;
@@ -2490,8 +2718,17 @@
             ship.hsCharge = 0;
             ship.hsConsumed = false;
             resetCombo();
+
+            if (gameState.isAttract || gameState.mode === 'attract') {
+                // Restart demo quietly
+                beginAttractRun();
+                return;
+            }
+
+            runStats.deaths++;
+            gameState.lives--;
             if (gameState.lives <= 0) {
-                endGame();
+                endGame(false);
             } else {
                 resetShip();
             }
@@ -2501,49 +2738,78 @@
             gameState.level++;
             gameState.lives++;
             gameState.bossSpawnedThisLevel = false;
+            runStats.levelReached = Math.max(runStats.levelReached, gameState.level);
             applyCrtTheme(gameState.level, { flash: true });
-            sfxLevelUp();
+            if (!gameState.isAttract) sfxLevelUp();
             showMessage(phosphorForLevel(gameState.level).name.toUpperCase(), 90);
             alienShip = null;
             alienMissiles = [];
             powerups = [];
-            // Center ship first so asteroid safe-radius is around the spawn point
             resetShip();
+            seedRunLevel(gameState.level);
             createAsteroids();
             scheduleAlienSpawn(gameState.hard ? 1400 : 2000, gameState.hard ? 2800 : 4000);
         }
 
-        function endGame() {
+        function endGame(cleared) {
+            if (gameState.isAttract || gameState.mode === 'attract') {
+                beginAttractRun();
+                return;
+            }
+            gameState.cleared = !!cleared;
             gameState.gameOver = true;
             gameState.mode = 'gameover';
             gameOverElement.style.display = 'block';
             updateControlsHelp();
             sfxGameOver();
+            fillRunStatsPanel();
+            if (recordingTrail.length > 8) {
+                saveGhostTrail(recordingTrail);
+            }
 
+            const title = cleared ? 'CLEARED!' : 'GAME OVER';
             if (qualifiesForHighScore(gameState.score)) {
                 gameState.enteringInitials = true;
-                gameOverText.textContent = 'HIGH SCORE!';
+                gameOverText.textContent = cleared ? 'CLEARED · HIGH SCORE!' : 'HIGH SCORE!';
                 initialsPrompt.style.display = 'block';
                 restartPrompt.style.display = 'none';
                 updateInitialsDisplay();
             } else {
-                gameOverText.textContent = 'GAME OVER';
+                gameOverText.textContent = title;
                 showLeaderboard();
             }
         }
 
-        function freshRunState(mode) {
+        function freshRunState(mode, opts) {
+            opts = opts || {};
+            const isAttract = mode === 'attract' || !!opts.attract;
+            const daily = !isAttract && !!titleDaily;
+            const dayId = utcDayId();
+            const challenge = isAttract ? 'none' : currentChallengeId();
+            const hard = !isAttract && !!titleHardMode;
+            const lbKey = leaderboardKeyFor({
+                daily: daily,
+                dayId: dayId,
+                challenge: challenge
+            });
             return {
                 mode: mode,
-                lives: 3,
+                lives: isAttract ? 99 : 3,
                 score: 0,
                 level: 1,
-                hard: !!titleHardMode,
+                hard: hard,
+                daily: daily,
+                dayId: dayId,
+                dailySeed: daily ? hashString32('asteroids-daily-' + dayId) : 0,
+                challenge: challenge,
+                isAttract: isAttract,
+                cleared: false,
                 bossSpawnedThisLevel: false,
                 gameOver: false,
                 enteringInitials: false,
                 initials: '',
-                leaderboard: loadLeaderboard(),
+                leaderboard: loadLeaderboard(lbKey),
+                leaderboardKey: lbKey,
                 nextExtraLife: EXTRA_LIFE_EVERY,
                 message: '',
                 messageTimer: 0
@@ -2562,20 +2828,74 @@
             combo.best = 1;
         }
 
+        function runBannerMessage() {
+            const parts = ['PLAYER 1'];
+            if (gameState.hard) parts.push('HARD');
+            if (gameState.daily) parts.push('DAILY');
+            if (gameState.challenge === 'nohs') parts.push('NO HS');
+            if (gameState.challenge === 'nopu') parts.push('NO PU');
+            if (gameState.challenge === 'survive') parts.push('SURVIVE');
+            return parts.join(' · ');
+        }
+
         function beginRun() {
+            titleIdleSec = 0;
             gameState = freshRunState('playing');
+            runStats = freshRunStats();
+            recordingTrail = [];
+            ghostSampleAcc = 0;
+            ghostTrail = loadGhostTrail();
             clearWorld();
+            seedRunLevel(1);
             applyCrtTheme(1);
             resetShip();
             createAsteroids();
             gameOverElement.style.display = 'none';
+            if (runStatsEl) runStatsEl.style.display = 'none';
             initialsPrompt.style.display = 'none';
             leaderboard.style.display = 'none';
             restartPrompt.style.display = 'block';
-            showMessage(gameState.hard ? 'PLAYER 1 · HARD' : 'PLAYER 1', 80);
+            showMessage(runBannerMessage(), 90);
             updateHud();
-            // Level 1: no saucers until level 2 (schedule is a no-op below level 2)
             scheduleAlienSpawn(8000, 14000);
+        }
+
+        function beginAttractRun() {
+            titleIdleSec = 0;
+            gameState = freshRunState('attract', { attract: true });
+            runStats = freshRunStats();
+            recordingTrail = [];
+            clearWorld();
+            setRngSeed(hashString32('attract-' + Date.now()));
+            applyCrtTheme(1 + Math.floor(Math.random() * CRT_PHOSPHORS.length));
+            resetShip();
+            createAsteroids();
+            gameOverElement.style.display = 'none';
+            if (runStatsEl) runStatsEl.style.display = 'none';
+            initialsPrompt.style.display = 'none';
+            leaderboard.style.display = 'none';
+            showMessage('DEMO', 60);
+            updateHud();
+            scheduleAlienSpawn(4000, 8000);
+            clearHeldKeys();
+        }
+
+        function exitAttractToTitle() {
+            gameState.mode = 'title';
+            gameState.isAttract = false;
+            gameState.gameOver = false;
+            gameState.enteringInitials = false;
+            clearWorld();
+            setRngSeed(null);
+            applyCrtTheme(1);
+            createAsteroids();
+            resetShip();
+            ship.invulnerable = 0;
+            gameOverElement.style.display = 'none';
+            if (runStatsEl) runStatsEl.style.display = 'none';
+            titleIdleSec = 0;
+            updateHud();
+            clearHeldKeys();
         }
 
         function startGame() {
@@ -2588,10 +2908,71 @@
 
         function updateControlsHelp() {
             if (!controlsHelp) return;
-            // Help text only before play or while paused — not during active play
+            // Help text only before play or while paused — not during active play / attract
             const show = gameState.mode === 'title' || gameState.mode === 'paused';
             controlsHelp.classList.toggle('is-visible', show);
             controlsHelp.setAttribute('aria-hidden', show ? 'false' : 'true');
+        }
+
+        // Simple attract AI: face nearest rock, thrust if far, fire on cooldown
+        let attractFireCd = 0;
+        function updateAttractAI(f) {
+            attractFireCd -= f;
+            let target = null;
+            let best = Infinity;
+            for (let i = 0; i < asteroids.length; i++) {
+                const a = asteroids[i];
+                const d = (a.x - ship.x) * (a.x - ship.x) + (a.y - ship.y) * (a.y - ship.y);
+                if (d < best) {
+                    best = d;
+                    target = a;
+                }
+            }
+            if (alienShip) {
+                const d = (alienShip.x - ship.x) * (alienShip.x - ship.x) +
+                    (alienShip.y - ship.y) * (alienShip.y - ship.y);
+                if (d < best) {
+                    target = alienShip;
+                    best = d;
+                }
+            }
+            // dodge alien bullets if close
+            for (let i = 0; i < alienMissiles.length; i++) {
+                const m = alienMissiles[i];
+                const d = (m.x - ship.x) * (m.x - ship.x) + (m.y - ship.y) * (m.y - ship.y);
+                if (d < 55 * 55) {
+                    const flee = Math.atan2(ship.y - m.y, ship.x - m.x);
+                    let diff = flee - ship.angle;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    ship.angle += Math.sign(diff) * Math.min(0.15 * f, Math.abs(diff));
+                    ship.boosting = true;
+                    ship.vx += Math.cos(ship.angle) * 0.28 * f;
+                    ship.vy += Math.sin(ship.angle) * 0.28 * f;
+                    return;
+                }
+            }
+            if (target) {
+                const desired = Math.atan2(target.y - ship.y, target.x - ship.x);
+                let diff = desired - ship.angle;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                ship.angle += Math.sign(diff) * Math.min(0.14 * f, Math.abs(diff));
+                const dist = Math.sqrt(best);
+                if (dist > 90) {
+                    ship.boosting = true;
+                    ship.vx += Math.cos(ship.angle) * 0.26 * f;
+                    ship.vy += Math.sin(ship.angle) * 0.26 * f;
+                } else {
+                    ship.boosting = false;
+                }
+                if (attractFireCd <= 0 && Math.abs(diff) < 0.35) {
+                    firePlayerMissiles();
+                    attractFireCd = 14 + Math.random() * 10;
+                }
+            } else {
+                ship.boosting = false;
+            }
         }
 
         function updateHud() {
@@ -2639,21 +3020,33 @@
             });
             gameState.leaderboard.sort((a, b) => b.score - a.score);
             gameState.leaderboard = gameState.leaderboard.slice(0, 10);
-            saveLeaderboard(gameState.leaderboard);
+            saveLeaderboard(gameState.leaderboard, gameState.leaderboardKey);
         }
 
         function showLeaderboard() {
             gameState.enteringInitials = false;
             initialsPrompt.style.display = 'none';
+            if (leaderboardTitle) {
+                leaderboardTitle.textContent = leaderboardTitleText();
+            }
 
             leaderboardList.textContent = '';
-            gameState.leaderboard.forEach((entry, index) => {
-                const row = document.createElement('div');
-                row.textContent = (index + 1) + '. ' + entry.initials + ' - ' + entry.score;
-                leaderboardList.appendChild(row);
-            });
+            if (!gameState.leaderboard.length) {
+                const empty = document.createElement('div');
+                empty.textContent = '(no scores yet)';
+                leaderboardList.appendChild(empty);
+            } else {
+                gameState.leaderboard.forEach((entry, index) => {
+                    const row = document.createElement('div');
+                    row.textContent = (index + 1) + '. ' + entry.initials + ' - ' + entry.score;
+                    leaderboardList.appendChild(row);
+                });
+            }
             leaderboard.style.display = 'block';
             restartPrompt.style.display = 'block';
+            if (runStatsEl && runStatsEl.style.display !== 'block') {
+                fillRunStatsPanel();
+            }
         }
 
         function resetShip() {
@@ -2698,12 +3091,29 @@
             }
 
             if (gameState.mode === 'title') {
+                titleIdleSec += dt;
                 updateTitleAmbient(dt);
+                if (titleIdleSec >= ATTRACT_IDLE_SEC) {
+                    beginAttractRun();
+                }
                 return;
             }
-            if (gameState.mode !== 'playing' || gameState.gameOver) return;
+            if (gameState.mode === 'paused' || gameState.gameOver) return;
+            if (gameState.mode !== 'playing' && gameState.mode !== 'attract') return;
+
             const f = dt * TARGET_FPS;
             const worldF = ship.slowField > 0 ? f * 0.55 : f;
+
+            if (isRealPlay()) {
+                runStats.timeAlive += dt;
+                runStats.levelReached = Math.max(runStats.levelReached, gameState.level);
+                sampleGhostPoint(dt);
+                // Survive challenge clear
+                if (gameState.challenge === 'survive' && runStats.timeAlive >= SURVIVE_GOAL_SEC) {
+                    endGame(true);
+                    return;
+                }
+            }
 
             tickAlienSpawn(f);
             tickCombo(f);
@@ -2737,67 +3147,73 @@
                 if (ship.slowField < 0) ship.slowField = 0;
             }
 
-            // Hyperspace: hold H/Down to charge safe jump; short press (release) = risky
-            const hsHeld = !!(keys['KeyH'] || keys['ArrowDown']);
-            if (ship.hyperspaceCooldown > 0) {
-                ship.hsCharge = 0;
-                ship.hsConsumed = false;
-            } else if (hsHeld) {
-                if (!ship.hsConsumed) {
-                    ship.hsCharge += f;
-                    if (ship.hsCharge >= HYPERSPACE_HOLD_FRAMES) {
-                        tryHyperspace(true);
+            // Input: player or attract AI
+            if (gameState.mode === 'attract') {
+                updateAttractAI(f);
+            } else {
+                // Hyperspace: hold H/Down to charge safe jump; short press (release) = risky
+                const hsHeld = !!(keys['KeyH'] || keys['ArrowDown']);
+                if (gameState.challenge === 'nohs') {
+                    ship.hsCharge = 0;
+                } else if (ship.hyperspaceCooldown > 0) {
+                    ship.hsCharge = 0;
+                    ship.hsConsumed = false;
+                } else if (hsHeld) {
+                    if (!ship.hsConsumed) {
+                        ship.hsCharge += f;
+                        if (ship.hsCharge >= HYPERSPACE_HOLD_FRAMES) {
+                            tryHyperspace(true);
+                        }
                     }
+                } else {
+                    if (ship.hsCharge > 0 && ship.hsCharge < HYPERSPACE_HOLD_FRAMES && !ship.hsConsumed) {
+                        tryHyperspace(false);
+                    }
+                    ship.hsCharge = 0;
+                    ship.hsConsumed = false;
                 }
-            } else {
-                if (ship.hsCharge > 0 && ship.hsCharge < HYPERSPACE_HOLD_FRAMES && !ship.hsConsumed) {
-                    tryHyperspace(false);
+
+                // Steering
+                if (isTurningLeft()) ship.angle -= 0.15 * f;
+                if (isTurningRight()) ship.angle += 0.15 * f;
+
+                if (isBoosting()) {
+                    ship.boosting = true;
+                    ship.vx += Math.cos(ship.angle) * 0.3 * f;
+                    ship.vy += Math.sin(ship.angle) * 0.3 * f;
+                    sfxThrust();
+                    const thrusterX = ship.x - Math.cos(ship.angle) * 15;
+                    const thrusterY = ship.y - Math.sin(ship.angle) * 15;
+                    if (Math.random() < 0.5 * Math.min(f, 1.5)) {
+                        particles.push({
+                            x: thrusterX + (Math.random() - 0.5) * 4,
+                            y: thrusterY + (Math.random() - 0.5) * 4,
+                            vx: -Math.cos(ship.angle) * 2 + (Math.random() - 0.5),
+                            vy: -Math.sin(ship.angle) * 2 + (Math.random() - 0.5),
+                            life: 15,
+                            maxLife: 15
+                        });
+                    }
+                } else {
+                    ship.boosting = false;
                 }
-                ship.hsCharge = 0;
-                ship.hsConsumed = false;
-            }
 
-            // Steering
-            if (isTurningLeft()) ship.angle -= 0.15 * f;
-            if (isTurningRight()) ship.angle += 0.15 * f;
-
-            if (isBoosting()) {
-                ship.boosting = true;
-                ship.vx += Math.cos(ship.angle) * 0.3 * f;
-                ship.vy += Math.sin(ship.angle) * 0.3 * f;
-                sfxThrust();
-                const thrusterX = ship.x - Math.cos(ship.angle) * 15;
-                const thrusterY = ship.y - Math.sin(ship.angle) * 15;
-                if (Math.random() < 0.5 * Math.min(f, 1.5)) {
-                    particles.push({
-                        x: thrusterX + (Math.random() - 0.5) * 4,
-                        y: thrusterY + (Math.random() - 0.5) * 4,
-                        vx: -Math.cos(ship.angle) * 2 + (Math.random() - 0.5),
-                        vy: -Math.sin(ship.angle) * 2 + (Math.random() - 0.5),
-                        life: 15,
-                        maxLife: 15
-                    });
-                }
-            } else {
-                ship.boosting = false;
-            }
-
-            if (keys['Space']) {
-                if (!keys.spacePressed) {
-                    firePlayerMissiles();
-                    keys.spacePressed = true;
-                } else if (ship.rapidFire > 0) {
-                    // Auto-fire while holding Space during rapid power-up
-                    if (!keys.rapidAcc) keys.rapidAcc = 0;
-                    keys.rapidAcc += f;
-                    if (keys.rapidAcc >= 6) {
-                        keys.rapidAcc = 0;
+                if (keys['Space']) {
+                    if (!keys.spacePressed) {
                         firePlayerMissiles();
+                        keys.spacePressed = true;
+                    } else if (ship.rapidFire > 0) {
+                        if (!keys.rapidAcc) keys.rapidAcc = 0;
+                        keys.rapidAcc += f;
+                        if (keys.rapidAcc >= 6) {
+                            keys.rapidAcc = 0;
+                            firePlayerMissiles();
+                        }
                     }
+                } else {
+                    keys.spacePressed = false;
+                    keys.rapidAcc = 0;
                 }
-            } else {
-                keys.spacePressed = false;
-                keys.rapidAcc = 0;
             }
 
             // Ship motion
@@ -2882,9 +3298,13 @@
                     if (checkCollision(missiles[mi], asteroids[ai], 2, asteroids[ai].size)) {
                         const pts = asteroidPoints(asteroids[ai].size);
                         addScore(pts, asteroids[ai].x, asteroids[ai].y, true);
+                        if (isRealPlay()) {
+                            runStats.hits++;
+                            runStats.rocks++;
+                        }
                         const pieces = breakAsteroid(asteroids[ai]);
                         if (pieces) splitAsteroids.push(...pieces);
-                        sfxExplode();
+                        if (!gameState.isAttract) sfxExplode();
                         asteroidsToRemove.add(ai);
                         missilesToRemove.add(mi);
                     }
@@ -2897,16 +3317,20 @@
                     if (checkCollision(missiles[mi], alienShip, 2, alienShip.size)) {
                         missilesToRemove.add(mi);
                         createParticles(alienShip.x, alienShip.y, 10);
+                        if (isRealPlay()) runStats.hits++;
                         if (alienShip.type === 'boss' && alienShip.hp > 1) {
                             alienShip.hp--;
-                            sfxAlienHit('large');
+                            if (!gameState.isAttract) sfxAlienHit('large');
                             showMessage('BOSS ' + alienShip.hp + '/' + alienShip.maxHp, 40);
                         } else {
                             alienScore = alienShip.scoreValue;
                             alienX = alienShip.x;
                             alienY = alienShip.y;
                             createParticles(alienShip.x, alienShip.y, 14);
-                            sfxAlienHit(alienShip.type === 'boss' ? 'large' : alienShip.type);
+                            if (!gameState.isAttract) {
+                                sfxAlienHit(alienShip.type === 'boss' ? 'large' : alienShip.type);
+                            }
+                            if (isRealPlay()) runStats.ufos++;
                             killAlien = true;
                         }
                         break;
@@ -2985,6 +3409,28 @@
             ctx.strokeStyle = ink;
             ctx.fillStyle = ink;
             ctx.lineWidth = 2;
+
+            // Ghost trail from last real run
+            if ((gameState.mode === 'playing' || gameState.mode === 'paused') &&
+                ghostTrail && ghostTrail.length > 1) {
+                ctx.save();
+                ctx.strokeStyle = crtRgba(0.18);
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let gi = 0; gi < ghostTrail.length; gi++) {
+                    const gp = ghostTrail[gi];
+                    if (gi === 0) ctx.moveTo(gp.x, gp.y);
+                    else ctx.lineTo(gp.x, gp.y);
+                }
+                ctx.stroke();
+                const last = ghostTrail[ghostTrail.length - 1];
+                ctx.globalAlpha = 0.25;
+                ctx.beginPath();
+                ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
 
             // Ship
             if (gameState.mode !== 'title' &&
@@ -3141,13 +3587,30 @@
             ctx.textAlign = 'left';
 
             // HUD extras on canvas (below LEVEL in the top-right DOM)
-            if (gameState.mode === 'playing' || gameState.mode === 'paused') {
+            if (gameState.mode === 'playing' || gameState.mode === 'paused' || gameState.mode === 'attract') {
                 ctx.font = '12px "Courier New", monospace';
                 ctx.fillStyle = crtTheme.dim;
                 ctx.textAlign = 'right';
                 let hudY = 56;
+                if (gameState.mode === 'attract') {
+                    ctx.fillText('DEMO', canvas.width - 14, hudY);
+                    hudY += 16;
+                }
                 if (gameState.hard) {
                     ctx.fillText('HARD', canvas.width - 14, hudY);
+                    hudY += 16;
+                }
+                if (gameState.daily) {
+                    ctx.fillText('DAILY', canvas.width - 14, hudY);
+                    hudY += 16;
+                }
+                if (gameState.challenge && gameState.challenge !== 'none') {
+                    ctx.fillText(gameState.challenge.toUpperCase(), canvas.width - 14, hudY);
+                    hudY += 16;
+                }
+                if (gameState.challenge === 'survive' && isRealPlay()) {
+                    const left = Math.max(0, SURVIVE_GOAL_SEC - runStats.timeAlive);
+                    ctx.fillText('LEFT ' + formatTime(left), canvas.width - 14, hudY);
                     hudY += 16;
                 }
                 if (combo.mult > 1) {
@@ -3183,7 +3646,8 @@
             }
 
             // Center message
-            if (gameState.message && gameState.messageTimer > 0 && gameState.mode === 'playing') {
+            if (gameState.message && gameState.messageTimer > 0 &&
+                (gameState.mode === 'playing' || gameState.mode === 'attract')) {
                 ctx.fillStyle = ink;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -3248,17 +3712,30 @@
                 );
                 ctx.fillStyle = titleHardMode ? ink : crtTheme.dim;
                 ctx.fillText(
-                    titleHardMode ? 'MODE  [  HARD  ]  G TOGGLE' : 'MODE  [  NORMAL  ]  G TOGGLE',
+                    titleHardMode ? 'MODE  [  HARD  ]  G' : 'MODE  [  NORMAL  ]  G',
                     cx,
-                    cy + 70
+                    cy + 68
                 );
+                ctx.fillStyle = titleDaily ? ink : crtTheme.dim;
+                ctx.fillText(
+                    titleDaily ? 'DAILY  [  ON  ' + utcDayId() + '  ]  D' : 'DAILY  [  OFF  ]  D',
+                    cx,
+                    cy + 88
+                );
+                const ch = CHALLENGE_OPTS[titleChallengeIndex] || CHALLENGE_OPTS[0];
+                ctx.fillStyle = ch.id !== 'none' ? ink : crtTheme.dim;
+                ctx.fillText('CHALLENGE  [  ' + ch.label + '  ]  C', cx, cy + 108);
 
                 ctx.fillStyle = ink;
                 ctx.font = '16px "Courier New", monospace';
                 ctx.shadowBlur = 6;
                 if (Math.floor(performance.now() / 500) % 2) {
-                    ctx.fillText('PRESS A KEY', cx, cy + 100);
+                    ctx.fillText('PRESS A KEY', cx, cy + 138);
                 }
+                ctx.font = '11px "Courier New", monospace';
+                ctx.fillStyle = crtTheme.dim;
+                ctx.shadowBlur = 0;
+                ctx.fillText('IDLE → DEMO', cx, cy + 160);
                 ctx.shadowBlur = 0;
                 ctx.lineWidth = 2;
                 ctx.textAlign = 'left';
@@ -3280,6 +3757,17 @@
                 ctx.shadowBlur = 6;
                 ctx.fillText('Press P to resume', canvas.width / 2, canvas.height / 2 + 36);
                 ctx.shadowBlur = 0;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
+
+            // Attract overlay hint
+            if (gameState.mode === 'attract') {
+                ctx.fillStyle = crtRgba(0.55);
+                ctx.font = '14px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('ATTRACT MODE · PRESS A KEY', canvas.width / 2, canvas.height - 18);
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'alphabetic';
             }
