@@ -468,6 +468,12 @@
 
         /* Full original screen size (800×600 canvas + bezel); scale from bottom */
         .crt-computer {
+            /* Phosphor theme (level cycles 8 CRT colours; JS updates --crt-*) */
+            --crt-hex: #00FF66;
+            --crt-r: 0;
+            --crt-g: 255;
+            --crt-b: 102;
+            --crt-dim: #00aa44;
             position: absolute;
             left: 50%;
             bottom: 0;
@@ -794,12 +800,17 @@
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: radial-gradient(circle at 35% 30%, #6f6, #1a3 55%, #061a08);
+            background: radial-gradient(
+                circle at 35% 30%,
+                rgb(var(--crt-r), var(--crt-g), var(--crt-b)),
+                rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.45) 55%,
+                #061008
+            );
             box-shadow:
-                0 0 6px #3f8,
-                0 0 14px rgba(40, 255, 80, 0.55),
+                0 0 6px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.7),
+                0 0 14px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.5),
                 inset 0 -1px 2px rgba(0, 0, 0, 0.45);
-            border: 1px solid #0a2a10;
+            border: 1px solid rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.25);
         }
 
         /* Screen well (recessed bezel) */
@@ -815,14 +826,14 @@
             position: relative;
         }
 
-        /* Soft green cast from lit CRT onto inner bezel */
+        /* Soft phosphor cast from lit CRT onto inner bezel */
         .crt-screen-well::before {
             content: '';
             position: absolute;
             inset: 8px;
             border-radius: 10px;
             pointer-events: none;
-            box-shadow: inset 0 0 40px rgba(20, 120, 40, 0.12);
+            box-shadow: inset 0 0 40px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.12);
             z-index: 2;
         }
 
@@ -837,7 +848,7 @@
             position: relative;
         }
 
-        /* Actual game screen host — keeps game visuals as-is */
+        /* Actual game screen host — phosphor glow follows level theme */
         .crt-screen {
             position: relative;
             width: 800px;
@@ -847,8 +858,8 @@
             background: #000;
             box-shadow:
                 0 0 0 1px #050505,
-                0 0 24px rgba(40, 200, 80, 0.12),
-                inset 0 0 30px rgba(0, 40, 0, 0.25);
+                0 0 24px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.14),
+                inset 0 0 30px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.08);
         }
 
         canvas {
@@ -879,13 +890,13 @@
                     transparent 58%,
                     rgba(255, 255, 255, 0.03) 100%
                 ),
-                /* scanlines */
+                /* scanlines tinted by phosphor */
                 repeating-linear-gradient(
                     0deg,
                     transparent,
                     transparent 2px,
-                    rgba(0, 255, 0, 0.03) 2px,
-                    rgba(0, 255, 0, 0.03) 4px
+                    rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.03) 2px,
+                    rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.03) 4px
                 );
             box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
         }
@@ -904,9 +915,9 @@
             position: absolute;
             top: 12px;
             left: 14px;
-            color: #00ff00;
+            color: var(--crt-hex);
             font-size: 16px;
-            text-shadow: 0 0 10px #00ff00;
+            text-shadow: 0 0 10px var(--crt-hex);
             z-index: 4;
             pointer-events: none;
         }
@@ -915,7 +926,7 @@
             position: absolute;
             bottom: 12px;
             left: 14px;
-            color: #00aa00;
+            color: var(--crt-dim);
             font-size: 12px;
             line-height: 1.4;
             z-index: 4;
@@ -927,10 +938,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #00ff00;
+            color: var(--crt-hex);
             font-size: 24px;
             text-align: center;
-            text-shadow: 0 0 20px #00ff00;
+            text-shadow: 0 0 20px var(--crt-hex);
             z-index: 10;
         }
 
@@ -1242,6 +1253,71 @@
         const MAX_MISSILES = 4;
         const MAX_MISSILES_RAPID = 7;
         const HYPERSPACE_COOLDOWN = 180; // frames @ 60fps ≈ 3s
+
+        // Classic CRT phosphor palette — cycles every 8 levels
+        const CRT_PHOSPHORS = [
+            { name: 'P1 Green',   hex: '#00FF66', bg: '#000a04' },
+            { name: 'P3 Amber',   hex: '#FFB000', bg: '#0a0700' },
+            { name: 'P4 White',   hex: '#E8F0FF', bg: '#05060a' },
+            { name: 'Aqua',       hex: '#00E5C8', bg: '#000a09' },
+            { name: 'Orange-red', hex: '#FF5A2A', bg: '#0a0302' },
+            { name: 'Ice blue',   hex: '#6AB0FF', bg: '#02040a' },
+            { name: 'Chartreuse', hex: '#C8FF40', bg: '#060a00' },
+            { name: 'Magenta',    hex: '#FF55C8', bg: '#0a0208' }
+        ];
+
+        let crtTheme = {
+            name: CRT_PHOSPHORS[0].name,
+            hex: CRT_PHOSPHORS[0].hex,
+            bg: CRT_PHOSPHORS[0].bg,
+            r: 0, g: 255, b: 102,
+            dim: '#00aa44',
+            dimR: 0, dimG: 170, dimB: 68
+        };
+
+        function hexToRgb(hex) {
+            const h = String(hex).replace('#', '');
+            return {
+                r: parseInt(h.slice(0, 2), 16),
+                g: parseInt(h.slice(2, 4), 16),
+                b: parseInt(h.slice(4, 6), 16)
+            };
+        }
+
+        function phosphorForLevel(level) {
+            const n = CRT_PHOSPHORS.length;
+            const i = ((Math.max(1, level | 0) - 1) % n + n) % n;
+            return CRT_PHOSPHORS[i];
+        }
+
+        function applyCrtTheme(level) {
+            const p = phosphorForLevel(level == null ? 1 : level);
+            const rgb = hexToRgb(p.hex);
+            const dimR = Math.round(rgb.r * 0.55);
+            const dimG = Math.round(rgb.g * 0.55);
+            const dimB = Math.round(rgb.b * 0.55);
+            const dim = 'rgb(' + dimR + ',' + dimG + ',' + dimB + ')';
+            crtTheme = {
+                name: p.name,
+                hex: p.hex,
+                bg: p.bg,
+                r: rgb.r, g: rgb.g, b: rgb.b,
+                dim: dim,
+                dimR: dimR, dimG: dimG, dimB: dimB
+            };
+            const host = document.querySelector('.crt-computer');
+            if (host) {
+                host.style.setProperty('--crt-hex', p.hex);
+                host.style.setProperty('--crt-r', String(rgb.r));
+                host.style.setProperty('--crt-g', String(rgb.g));
+                host.style.setProperty('--crt-b', String(rgb.b));
+                host.style.setProperty('--crt-dim', dim);
+            }
+        }
+
+        function crtRgba(alpha) {
+            return 'rgba(' + crtTheme.r + ',' + crtTheme.g + ',' + crtTheme.b + ',' + alpha + ')';
+        }
 
         // --- localStorage ---
         function loadLeaderboard() {
@@ -1791,7 +1867,9 @@
         function nextLevel() {
             gameState.level++;
             gameState.lives++;
-            showMessage('LEVEL ' + gameState.level, 100);
+            applyCrtTheme(gameState.level);
+            const ph = phosphorForLevel(gameState.level);
+            showMessage('LEVEL ' + gameState.level + ' · ' + ph.name.toUpperCase(), 100);
             alienShip = null;
             alienMissiles = [];
             powerups = [];
@@ -1847,6 +1925,7 @@
         function startGame() {
             gameState = freshRunState('playing');
             clearWorld();
+            applyCrtTheme(1);
             resetShip();
             createAsteroids();
             gameOverElement.style.display = 'none';
@@ -1862,6 +1941,7 @@
         function restartGame() {
             gameState = freshRunState('playing');
             clearWorld();
+            applyCrtTheme(1);
             resetShip();
             createAsteroids();
             gameOverElement.style.display = 'none';
@@ -2201,11 +2281,12 @@
         }
 
         function render() {
-            ctx.fillStyle = '#000800';
+            const ink = crtTheme.hex;
+            ctx.fillStyle = crtTheme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = '#00ff00';
-            ctx.fillStyle = '#00ff00';
+            ctx.strokeStyle = ink;
+            ctx.fillStyle = ink;
             ctx.lineWidth = 2;
 
             // Ship
@@ -2236,9 +2317,9 @@
                 if (ship.invulnerable > 40) {
                     ctx.beginPath();
                     ctx.arc(0, 0, 16, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.45)';
+                    ctx.strokeStyle = crtRgba(0.45);
                     ctx.stroke();
-                    ctx.strokeStyle = '#00ff00';
+                    ctx.strokeStyle = ink;
                 }
 
                 ctx.restore();
@@ -2275,13 +2356,13 @@
                 ctx.restore();
             }
 
-            // Alien missiles
+            // Alien missiles — warm contrast vs monochrome phosphor
             alienMissiles.forEach(missile => {
-                ctx.fillStyle = '#ff4444';
+                ctx.fillStyle = '#ff5544';
                 ctx.beginPath();
                 ctx.arc(missile.x, missile.y, 3, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = ink;
             });
 
             // Asteroids
@@ -2306,38 +2387,41 @@
                 ctx.restore();
             });
 
-            // Power-ups
+            // Power-ups (slightly brighter phosphor so they pop)
             powerups.forEach(p => {
                 const blink = Math.floor(performance.now() / 120) % 2;
                 if (!blink && p.life < 90) return;
                 ctx.save();
                 ctx.translate(p.x, p.y);
-                ctx.strokeStyle = '#00ff88';
+                ctx.strokeStyle = ink;
+                ctx.shadowColor = ink;
+                ctx.shadowBlur = 8;
                 ctx.beginPath();
                 ctx.arc(0, 0, p.size, 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.fillStyle = '#00ff88';
+                ctx.fillStyle = ink;
                 ctx.font = '10px "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const label = p.type === 'shield' ? 'S' : (p.type === 'rapid' ? 'R' : 'T');
                 ctx.fillText(label, 0, 1);
+                ctx.shadowBlur = 0;
                 ctx.restore();
-                ctx.strokeStyle = '#00ff00';
-                ctx.fillStyle = '#00ff00';
+                ctx.strokeStyle = ink;
+                ctx.fillStyle = ink;
             });
 
             // Particles
             particles.forEach(particle => {
                 const alpha = particle.life / particle.maxLife;
-                ctx.fillStyle = 'rgba(0, 255, 0, ' + alpha + ')';
+                ctx.fillStyle = crtRgba(alpha);
                 ctx.fillRect(particle.x, particle.y, 2, 2);
             });
 
             // Floating scores
             floatScores.forEach(fs => {
                 const alpha = fs.life / fs.maxLife;
-                ctx.fillStyle = 'rgba(0, 255, 0, ' + alpha + ')';
+                ctx.fillStyle = crtRgba(alpha);
                 ctx.font = '12px "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText('+' + fs.pts, fs.x, fs.y);
@@ -2347,7 +2431,7 @@
             // HUD extras on canvas
             if (gameState.mode === 'playing' || gameState.mode === 'paused') {
                 ctx.font = '12px "Courier New", monospace';
-                ctx.fillStyle = '#00aa00';
+                ctx.fillStyle = crtTheme.dim;
                 let hudY = 20;
                 if (ship.hyperspaceCooldown > 0) {
                     ctx.fillText('HS COOLDOWN', canvas.width - 120, hudY);
@@ -2364,11 +2448,11 @@
 
             // Center message
             if (gameState.message && gameState.messageTimer > 0 && gameState.mode === 'playing') {
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = ink;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 28px "Courier New", monospace';
-                ctx.shadowColor = '#00ff00';
+                ctx.shadowColor = ink;
                 ctx.shadowBlur = 10;
                 ctx.fillText(gameState.message, canvas.width / 2, canvas.height / 2 - 80);
                 ctx.shadowBlur = 0;
@@ -2378,13 +2462,13 @@
 
             // Title
             if (gameState.mode === 'title') {
-                ctx.fillStyle = 'rgba(0, 8, 0, 0.55)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = ink;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 48px "Courier New", monospace';
-                ctx.shadowColor = '#00ff00';
+                ctx.shadowColor = ink;
                 ctx.shadowBlur = 16;
                 ctx.fillText('ASTEROIDS', canvas.width / 2, canvas.height / 2 - 40);
                 ctx.font = '20px "Courier New", monospace';
@@ -2402,13 +2486,13 @@
 
             // Pause
             if (gameState.mode === 'paused') {
-                ctx.fillStyle = 'rgba(0, 8, 0, 0.45)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = ink;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 36px "Courier New", monospace';
-                ctx.shadowColor = '#00ff00';
+                ctx.shadowColor = ink;
                 ctx.shadowBlur = 12;
                 ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
                 ctx.font = '14px "Courier New", monospace';
@@ -2479,7 +2563,8 @@
             window.addEventListener('resize', fitCrtToViewport);
         })();
 
-        // Boot: title with drifting rocks
+        // Boot: title with drifting rocks + default P1 green phosphor
+        applyCrtTheme(1);
         createAsteroids();
         resetShip();
         ship.invulnerable = 0;
