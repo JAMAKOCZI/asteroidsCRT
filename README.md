@@ -10,13 +10,14 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 
 ## Features
 
-- Vector ship with thrust, turn, and fire
-- Asteroids that split into smaller pieces
-- Levels with rising difficulty and an extra life per level
-- UFO enemy from level 3 (chases and shoots)
-- Particle effects (explosions, thruster)
-- High scores with initials (top 10, saved in `localStorage`)
-- CRT-style UI (scanlines, green glow)
+- Vector ship with thrust, turn, fire, and **hyperspace**
+- Asteroids that split into smaller pieces (classic point values)
+- Levels with rising difficulty; extra ship each level + every 10 000 points
+- Large / small UFO saucers (from level 2+) with tougher AI on higher levels
+- Power-ups: **S**hield, **R**apid fire, **T**riple shot
+- Particle FX, floating scores, CRT scanlines / green glow
+- High scores with initials (top 10, `localStorage`)
+- Title screen, pause, Web Audio SFX
 
 ---
 
@@ -25,8 +26,9 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 | Key | Action |
 |-----|--------|
 | **Left / Right** or **A / D** | Turn |
-| **Up / W** | Boost / thrust (Tab also works) |
-| **Space** | Fire |
+| **Up / W** | Boost / thrust |
+| **Space** | Fire (hold for auto-fire with Rapid) |
+| **H** or **Down** | Hyperspace (risky teleport; cooldown) |
 | **P** | Pause / resume |
 | **Any key** | Start from title screen |
 | **R** | Restart (after game over) |
@@ -66,9 +68,8 @@ Then open [http://localhost:8080](http://localhost:8080).
 
 ## Project status
 
-Arcade polish (approach A) is implemented: safe collisions, top-10 high scores,
-delta-time physics, classic boost keys, unique asteroid shapes, title screen,
-pause, and Web Audio SFX. See `docs/superpowers/specs/` for the design note.
+Arcade build with hyperspace, dual saucers, power-ups, and extra-life scoring.
+See `docs/superpowers/specs/` for the earlier polish design note.
 
 ---
 

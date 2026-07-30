@@ -16,7 +16,7 @@
             font-family: 'Courier New', monospace;
             overflow: hidden;
         }
-        
+
         .crt-container {
             position: relative;
             background: #001100;
@@ -24,16 +24,16 @@
             padding: 40px;
             box-shadow: 0 0 50px rgba(0, 255, 0, 0.3);
         }
-        
+
         canvas {
             background: #000;
             border: 3px solid #003300;
-            box-shadow: 
+            box-shadow:
                 inset 0 0 20px rgba(0, 255, 0, 0.1),
                 0 0 20px rgba(0, 255, 0, 0.2);
             image-rendering: pixelated;
         }
-        
+
         .crt-overlay {
             position: absolute;
             top: 40px;
@@ -41,7 +41,7 @@
             right: 40px;
             bottom: 40px;
             pointer-events: none;
-            background: 
+            background:
                 repeating-linear-gradient(
                     0deg,
                     transparent,
@@ -51,7 +51,7 @@
                 );
             border-radius: 3px;
         }
-        
+
         .ui {
             position: absolute;
             top: 50px;
@@ -60,7 +60,7 @@
             font-size: 16px;
             text-shadow: 0 0 10px #00ff00;
         }
-        
+
         .controls {
             position: absolute;
             bottom: 50px;
@@ -69,7 +69,7 @@
             font-size: 12px;
             line-height: 1.4;
         }
-        
+
         .game-over {
             position: absolute;
             top: 50%;
@@ -96,6 +96,7 @@
             LEFT/RIGHT or A/D: Turn<br>
             UP / W: Boost<br>
             SPACE: Fire<br>
+            H / DOWN: Hyperspace<br>
             P: Pause
         </div>
         <div id="gameOver" class="game-over" style="display: none;">
@@ -127,7 +128,14 @@
         const leaderboardList = document.getElementById('leaderboardList');
         const restartPrompt = document.getElementById('restartPrompt');
 
-        // localStorage helpers (private mode / quota can throw)
+        const MAX_SHIP_SPEED = 8;
+        const TARGET_FPS = 60;
+        const EXTRA_LIFE_EVERY = 10000;
+        const MAX_MISSILES = 4;
+        const MAX_MISSILES_RAPID = 7;
+        const HYPERSPACE_COOLDOWN = 180; // frames @ 60fps ≈ 3s
+
+        // --- localStorage ---
         function loadLeaderboard() {
             try {
                 const data = JSON.parse(localStorage.getItem('asteroidsLeaderboard') || '[]');
@@ -140,9 +148,7 @@
         function saveLeaderboard(entries) {
             try {
                 localStorage.setItem('asteroidsLeaderboard', JSON.stringify(entries));
-            } catch (e) {
-                // Ignore write failures (quota / private mode)
-            }
+            } catch (e) { /* private mode / quota */ }
         }
 
         function qualifiesForHighScore(score) {
@@ -161,16 +167,16 @@
             gameOver: false,
             enteringInitials: false,
             initials: '',
-            leaderboard: loadLeaderboard()
+            leaderboard: loadLeaderboard(),
+            nextExtraLife: EXTRA_LIFE_EVERY,
+            message: '',
+            messageTimer: 0
         };
 
-        const MAX_SHIP_SPEED = 8;
-        // Physics tuned for 60 FPS; multiply rates by (dt * 60)
-        const TARGET_FPS = 60;
         let lastFrameTime = 0;
         let lastThrustSound = 0;
 
-        // --- Web Audio (no asset files; unlocked on first user gesture) ---
+        // --- Web Audio ---
         let audioCtx = null;
 
         function ensureAudio() {
@@ -184,37 +190,37 @@
         }
 
         function playTone(freq, duration, type, volume) {
-            const ctx = ensureAudio();
-            if (!ctx) return;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
+            const ctxA = ensureAudio();
+            if (!ctxA) return;
+            const osc = ctxA.createOscillator();
+            const gain = ctxA.createGain();
             osc.type = type || 'square';
             osc.frequency.value = freq;
-            const now = ctx.currentTime;
+            const now = ctxA.currentTime;
             const vol = volume == null ? 0.04 : volume;
             gain.gain.setValueAtTime(vol, now);
             gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(ctxA.destination);
             osc.start(now);
             osc.stop(now + duration);
         }
 
         function playNoise(duration, volume) {
-            const ctx = ensureAudio();
-            if (!ctx) return;
-            const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
-            const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+            const ctxA = ensureAudio();
+            if (!ctxA) return;
+            const len = Math.max(1, Math.floor(ctxA.sampleRate * duration));
+            const buffer = ctxA.createBuffer(1, len, ctxA.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < len; i++) {
                 data[i] = (Math.random() * 2 - 1) * (1 - i / len);
             }
-            const src = ctx.createBufferSource();
+            const src = ctxA.createBufferSource();
             src.buffer = buffer;
-            const gain = ctx.createGain();
+            const gain = ctxA.createGain();
             gain.gain.value = volume == null ? 0.06 : volume;
             src.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(ctxA.destination);
             src.start();
         }
 
@@ -222,6 +228,9 @@
         function sfxExplode() { playNoise(0.18, 0.07); }
         function sfxDeath() { playNoise(0.28, 0.09); playTone(90, 0.25, 'sawtooth', 0.04); }
         function sfxAlienHit() { playTone(520, 0.08, 'square', 0.05); playTone(780, 0.1, 'square', 0.04); }
+        function sfxExtraLife() { playTone(440, 0.08, 'square', 0.05); playTone(660, 0.1, 'square', 0.05); playTone(880, 0.12, 'square', 0.05); }
+        function sfxHyperspace() { playTone(200, 0.15, 'sawtooth', 0.04); playNoise(0.12, 0.04); }
+        function sfxPowerup() { playTone(600, 0.06, 'square', 0.04); playTone(900, 0.1, 'square', 0.04); }
         function sfxThrust() {
             const now = performance.now();
             if (now - lastThrustSound < 80) return;
@@ -229,17 +238,15 @@
             playNoise(0.06, 0.015);
         }
 
-        // Input handling
+        // --- Input ---
         const keys = {};
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            // Prevent page scroll / focus steal for game keys
-            if (e.code === 'Tab' || e.code === 'Space' || e.code === 'ArrowUp' ||
-                e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+            if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' ||
+                e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
                 e.preventDefault();
             }
 
-            // Title: any key starts (and unlocks audio)
             if (gameState.mode === 'title') {
                 ensureAudio();
                 startGame();
@@ -256,6 +263,11 @@
                 return;
             }
 
+            if (gameState.mode === 'playing' && (e.code === 'KeyH' || e.code === 'ArrowDown')) {
+                tryHyperspace();
+                return;
+            }
+
             if (e.code === 'KeyR' && gameState.gameOver) {
                 ensureAudio();
                 restartGame();
@@ -266,7 +278,7 @@
         });
 
         function isBoosting() {
-            return !!(keys['ArrowUp'] || keys['KeyW'] || keys['Tab']);
+            return !!(keys['ArrowUp'] || keys['KeyW']);
         }
 
         function isTurningLeft() {
@@ -277,9 +289,9 @@
             return !!(keys['ArrowRight'] || keys['KeyD']);
         }
 
-        // Random irregular outline for each asteroid (cached radii)
+        // --- Entities ---
         function makeAsteroidVertices(size) {
-            const points = 8 + Math.floor(Math.random() * 5); // 8–12
+            const points = 8 + Math.floor(Math.random() * 5);
             const radii = [];
             for (let i = 0; i < points; i++) {
                 radii.push(size * (0.7 + Math.random() * 0.4));
@@ -301,7 +313,6 @@
             };
         }
 
-        // Ship object
         const ship = {
             x: canvas.width / 2,
             y: canvas.height / 2,
@@ -310,102 +321,148 @@
             vy: 0,
             size: 8,
             boosting: false,
-            invulnerable: 0
+            invulnerable: 0,
+            hyperspaceCooldown: 0,
+            rapidFire: 0,
+            tripleShot: 0
         };
 
-        // Game objects arrays
         let missiles = [];
         let asteroids = [];
         let particles = [];
+        let powerups = [];
+        let floatScores = [];
         let alienShip = null;
         let alienMissiles = [];
 
-        // Create alien ship
-        function createAlienShip() {
-            if (gameState.level >= 3 && !alienShip) {
-                // Spawn alien ship at edge of screen
-                const side = Math.floor(Math.random() * 4);
-                let x, y;
-                
-                switch(side) {
-                    case 0: x = 0; y = Math.random() * canvas.height; break;
-                    case 1: x = canvas.width; y = Math.random() * canvas.height; break;
-                    case 2: x = Math.random() * canvas.width; y = 0; break;
-                    case 3: x = Math.random() * canvas.width; y = canvas.height; break;
-                }
-                
-                alienShip = {
-                    x: x,
-                    y: y,
-                    vx: 0,
-                    vy: 0,
-                    size: 12,
-                    lastShot: 0,
-                    changeDirection: 0
-                };
+        // --- Scoring / messages ---
+        function showMessage(text, frames) {
+            gameState.message = text;
+            gameState.messageTimer = frames;
+        }
+
+        function spawnFloatScore(x, y, pts) {
+            floatScores.push({ x: x, y: y, pts: pts, life: 45, maxLife: 45 });
+        }
+
+        function addScore(points, x, y) {
+            gameState.score += points;
+            if (x != null && y != null) spawnFloatScore(x, y, points);
+            while (gameState.score >= gameState.nextExtraLife) {
+                gameState.lives++;
+                gameState.nextExtraLife += EXTRA_LIFE_EVERY;
+                showMessage('EXTRA SHIP!', 100);
+                sfxExtraLife();
             }
         }
 
-        // Update alien ship (f = frame scale from dt)
+        function asteroidPoints(size) {
+            if (size > 30) return 20;   // large
+            if (size > 15) return 50;   // medium
+            return 100;                // small
+        }
+
+        // --- Alien (large / small saucer) ---
+        function createAlienShip() {
+            if (alienShip) return;
+            if (gameState.level < 2) return;
+
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            switch (side) {
+                case 0: x = 0; y = Math.random() * canvas.height; break;
+                case 1: x = canvas.width; y = Math.random() * canvas.height; break;
+                case 2: x = Math.random() * canvas.width; y = 0; break;
+                default: x = Math.random() * canvas.width; y = canvas.height; break;
+            }
+
+            // Small saucer more common on higher levels (harder, more points)
+            const smallChance = Math.min(0.15 + gameState.level * 0.06, 0.65);
+            const isSmall = gameState.level >= 4 && Math.random() < smallChance;
+            const levelBoost = 1 + (gameState.level - 2) * 0.08;
+
+            alienShip = {
+                x: x,
+                y: y,
+                vx: 0,
+                vy: 0,
+                type: isSmall ? 'small' : 'large',
+                size: isSmall ? 7 : 14,
+                speed: (isSmall ? 3.0 : 1.7) * levelBoost,
+                scoreValue: isSmall ? 1000 : 200,
+                shootInterval: isSmall ? 48 : Math.max(55, 95 - gameState.level * 4),
+                aimJitter: isSmall ? 0.08 : 0.45,
+                lastShot: 0,
+                changeDirection: 0
+            };
+        }
+
+        function scheduleAlienSpawn(minMs, maxMs) {
+            const delay = minMs + Math.random() * (maxMs - minMs);
+            setTimeout(() => {
+                if (gameState.mode === 'playing' && !gameState.gameOver && !alienShip && gameState.level >= 2) {
+                    createAlienShip();
+                }
+            }, delay);
+        }
+
         function updateAlienShip(f) {
             if (!alienShip) return;
             f = f == null ? 1 : f;
-            
-            // AI: Chase player but with some randomness
+
             const dx = ship.x - alienShip.x;
             const dy = ship.y - alienShip.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // Change direction periodically
+
             if (alienShip.changeDirection <= 0) {
                 const targetAngle = Math.atan2(dy, dx);
-                const randomOffset = (Math.random() - 0.5) * Math.PI * 0.3;
+                const randomOffset = (Math.random() - 0.5) * Math.PI * (alienShip.type === 'small' ? 0.2 : 0.45);
                 const angle = targetAngle + randomOffset;
-                
-                alienShip.vx = Math.cos(angle) * 2;
-                alienShip.vy = Math.sin(angle) * 2;
-                alienShip.changeDirection = 60 + Math.random() * 60;
+                alienShip.vx = Math.cos(angle) * alienShip.speed;
+                alienShip.vy = Math.sin(angle) * alienShip.speed;
+                alienShip.changeDirection = (alienShip.type === 'small' ? 40 : 55) + Math.random() * 40;
             } else {
                 alienShip.changeDirection -= f;
             }
-            
-            // Move alien ship
+
             alienShip.x += alienShip.vx * f;
             alienShip.y += alienShip.vy * f;
             wrap(alienShip);
-            
-            // Shoot at player
+
             alienShip.lastShot += f;
-            if (alienShip.lastShot > 90 && distance < 300) { // ~1.5s when close
-                const shootAngle = Math.atan2(dy, dx);
+            const range = alienShip.type === 'small' ? 420 : 340;
+            if (alienShip.lastShot > alienShip.shootInterval && distance < range) {
+                const base = Math.atan2(dy, dx);
+                const shootAngle = base + (Math.random() - 0.5) * alienShip.aimJitter * Math.PI;
+                const bulletSpeed = alienShip.type === 'small' ? 5.2 : 3.8;
                 alienMissiles.push({
                     x: alienShip.x,
                     y: alienShip.y,
-                    vx: Math.cos(shootAngle) * 4,
-                    vy: Math.sin(shootAngle) * 4,
-                    life: 120
+                    vx: Math.cos(shootAngle) * bulletSpeed,
+                    vy: Math.sin(shootAngle) * bulletSpeed,
+                    life: 130
                 });
                 alienShip.lastShot = 0;
             }
         }
+
         function createAsteroids() {
             asteroids = [];
-            const baseCount = 5;
-            const asteroidCount = Math.floor(baseCount * Math.pow(1.25, gameState.level - 1));
-            const speedMultiplier = Math.pow(1.1, gameState.level - 1);
-            
+            const baseCount = 4;
+            const asteroidCount = Math.floor(baseCount * Math.pow(1.22, gameState.level - 1));
+            const speedMultiplier = Math.pow(1.12, gameState.level - 1);
+
             for (let i = 0; i < asteroidCount; i++) {
                 let x, y;
                 do {
                     x = Math.random() * canvas.width;
                     y = Math.random() * canvas.height;
-                } while (Math.sqrt((x - ship.x) ** 2 + (y - ship.y) ** 2) < 100);
-                
+                } while (Math.sqrt((x - ship.x) ** 2 + (y - ship.y) ** 2) < 120);
+
                 asteroids.push(makeAsteroid(x, y, 40, speedMultiplier, 2));
             }
         }
 
-        // Missile object constructor
         function createMissile(x, y, angle) {
             return {
                 x: x,
@@ -416,8 +473,8 @@
             };
         }
 
-        // Particle system
-        function createParticles(x, y, count = 8) {
+        function createParticles(x, y, count) {
+            count = count == null ? 8 : count;
             for (let i = 0; i < count; i++) {
                 particles.push({
                     x: x,
@@ -430,7 +487,6 @@
             }
         }
 
-        // Wrap coordinates around screen
         function wrap(obj) {
             if (obj.x < 0) obj.x = canvas.width;
             if (obj.x > canvas.width) obj.x = 0;
@@ -438,21 +494,26 @@
             if (obj.y > canvas.height) obj.y = 0;
         }
 
-        // Collision detection
         function checkCollision(obj1, obj2, radius1, radius2) {
             const dx = obj1.x - obj2.x;
             const dy = obj1.y - obj2.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance < radius1 + radius2;
+            return Math.sqrt(dx * dx + dy * dy) < radius1 + radius2;
         }
 
-        // Break asteroid into smaller pieces (returns new rocks; caller adds them)
+        function positionIsDangerous(x, y) {
+            const probe = { x: x, y: y };
+            for (let i = 0; i < asteroids.length; i++) {
+                if (checkCollision(probe, asteroids[i], ship.size, asteroids[i].size)) return true;
+            }
+            if (alienShip && checkCollision(probe, alienShip, ship.size, alienShip.size)) return true;
+            return false;
+        }
+
         function breakAsteroid(asteroid) {
             const pieces = [];
             if (asteroid.size > 15) {
                 const newSize = asteroid.size / 2;
-                const speedMultiplier = Math.pow(1.1, gameState.level - 1);
-                
+                const speedMultiplier = Math.pow(1.12, gameState.level - 1);
                 for (let i = 0; i < 2; i++) {
                     const piece = makeAsteroid(
                         asteroid.x + (Math.random() - 0.5) * 20,
@@ -466,64 +527,178 @@
                 }
             }
             createParticles(asteroid.x, asteroid.y, 6);
+
+            // Chance to drop power-up from larger rocks
+            if (asteroid.size > 20 && Math.random() < 0.14) {
+                spawnPowerup(asteroid.x, asteroid.y);
+            }
             return pieces;
         }
 
-        // Next level
-        function nextLevel() {
-            gameState.level++;
-            gameState.lives++; // Extra ship
-            alienShip = null; // Reset alien ship
-            alienMissiles = []; // Clear alien missiles
-            createAsteroids();
-            resetShip();
-            
-            // Create alien ship if level 3+
-            if (gameState.level >= 3) {
-                setTimeout(() => {
-                    createAlienShip();
-                }, 2000); // Spawn alien ship 2 seconds after level starts
+        function spawnPowerup(x, y) {
+            const types = ['shield', 'rapid', 'triple'];
+            powerups.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 1.2,
+                vy: (Math.random() - 0.5) * 1.2,
+                type: types[Math.floor(Math.random() * types.length)],
+                life: 420,
+                size: 10
+            });
+        }
+
+        function applyPowerup(type) {
+            sfxPowerup();
+            if (type === 'shield') {
+                ship.invulnerable = Math.max(ship.invulnerable, 240);
+                showMessage('SHIELD', 70);
+            } else if (type === 'rapid') {
+                ship.rapidFire = 360;
+                showMessage('RAPID FIRE', 70);
+            } else if (type === 'triple') {
+                ship.tripleShot = 360;
+                showMessage('TRIPLE SHOT', 70);
             }
         }
 
-        // End game
+        function firePlayerMissiles() {
+            const maxM = ship.rapidFire > 0 ? MAX_MISSILES_RAPID : MAX_MISSILES;
+            if (missiles.length >= maxM) return;
+
+            const angles = ship.tripleShot > 0
+                ? [ship.angle - 0.22, ship.angle, ship.angle + 0.22]
+                : [ship.angle];
+
+            for (let i = 0; i < angles.length; i++) {
+                if (missiles.length >= maxM) break;
+                missiles.push(createMissile(
+                    ship.x + Math.cos(angles[i]) * 12,
+                    ship.y + Math.sin(angles[i]) * 12,
+                    angles[i]
+                ));
+            }
+            sfxShoot();
+        }
+
+        function tryHyperspace() {
+            if (ship.hyperspaceCooldown > 0 || gameState.mode !== 'playing') return;
+
+            createParticles(ship.x, ship.y, 14);
+            sfxHyperspace();
+
+            ship.x = Math.random() * canvas.width;
+            ship.y = Math.random() * canvas.height;
+            ship.vx = 0;
+            ship.vy = 0;
+            ship.hyperspaceCooldown = HYPERSPACE_COOLDOWN;
+            ship.boosting = false;
+
+            // Classic risk: landing inside a rock kills you
+            if (positionIsDangerous(ship.x, ship.y)) {
+                createParticles(ship.x, ship.y, 16);
+                killShip();
+            } else {
+                createParticles(ship.x, ship.y, 10);
+                ship.invulnerable = Math.max(ship.invulnerable, 30);
+            }
+        }
+
+        function killShip() {
+            gameState.lives--;
+            createParticles(ship.x, ship.y, 14);
+            sfxDeath();
+            ship.rapidFire = 0;
+            ship.tripleShot = 0;
+            if (gameState.lives <= 0) {
+                endGame();
+            } else {
+                resetShip();
+            }
+        }
+
+        function nextLevel() {
+            gameState.level++;
+            gameState.lives++;
+            showMessage('LEVEL ' + gameState.level, 100);
+            alienShip = null;
+            alienMissiles = [];
+            powerups = [];
+            createAsteroids();
+            resetShip();
+            if (gameState.level >= 2) {
+                scheduleAlienSpawn(2000, 4000);
+            }
+        }
+
         function endGame() {
             gameState.gameOver = true;
             gameState.mode = 'gameover';
             gameOverElement.style.display = 'block';
-            
+
             if (qualifiesForHighScore(gameState.score)) {
                 gameState.enteringInitials = true;
-                gameOverText.textContent = "HIGH SCORE!";
+                gameOverText.textContent = 'HIGH SCORE!';
                 initialsPrompt.style.display = 'block';
                 restartPrompt.style.display = 'none';
                 updateInitialsDisplay();
             } else {
-                gameOverText.textContent = "GAME OVER";
+                gameOverText.textContent = 'GAME OVER';
                 showLeaderboard();
             }
         }
 
-        // First key from title screen
-        function startGame() {
-            gameState.mode = 'playing';
-            gameState.lives = 3;
-            gameState.score = 0;
-            gameState.level = 1;
-            gameState.gameOver = false;
-            gameState.enteringInitials = false;
-            gameState.initials = '';
+        function freshRunState(mode) {
+            return {
+                mode: mode,
+                lives: 3,
+                score: 0,
+                level: 1,
+                gameOver: false,
+                enteringInitials: false,
+                initials: '',
+                leaderboard: loadLeaderboard(),
+                nextExtraLife: EXTRA_LIFE_EVERY,
+                message: '',
+                messageTimer: 0
+            };
+        }
+
+        function clearWorld() {
             missiles = [];
             particles = [];
+            powerups = [];
+            floatScores = [];
             alienShip = null;
             alienMissiles = [];
+        }
+
+        function startGame() {
+            gameState = freshRunState('playing');
+            clearWorld();
             resetShip();
             createAsteroids();
             gameOverElement.style.display = 'none';
             initialsPrompt.style.display = 'none';
             leaderboard.style.display = 'none';
             restartPrompt.style.display = 'block';
+            showMessage('PLAYER 1', 80);
             updateHud();
+            scheduleAlienSpawn(8000, 14000);
+        }
+
+        function restartGame() {
+            gameState = freshRunState('playing');
+            clearWorld();
+            resetShip();
+            createAsteroids();
+            gameOverElement.style.display = 'none';
+            initialsPrompt.style.display = 'none';
+            leaderboard.style.display = 'none';
+            restartPrompt.style.display = 'block';
+            showMessage('PLAYER 1', 80);
+            updateHud();
+            scheduleAlienSpawn(8000, 14000);
         }
 
         function updateHud() {
@@ -532,7 +707,6 @@
             levelElement.textContent = gameState.level;
         }
 
-        // Handle initials input
         function handleInitialsInput(e) {
             if (e.code === 'Enter') {
                 if (gameState.initials.length === 3) {
@@ -562,32 +736,35 @@
                 score: gameState.score
             });
             gameState.leaderboard.sort((a, b) => b.score - a.score);
-            gameState.leaderboard = gameState.leaderboard.slice(0, 10); // Keep top 10
+            gameState.leaderboard = gameState.leaderboard.slice(0, 10);
             saveLeaderboard(gameState.leaderboard);
         }
 
         function showLeaderboard() {
             gameState.enteringInitials = false;
             initialsPrompt.style.display = 'none';
-            
+
             let leaderboardHTML = '';
             gameState.leaderboard.forEach((entry, index) => {
-                leaderboardHTML += `<div>${index + 1}. ${entry.initials} - ${entry.score}</div>`;
+                leaderboardHTML += '<div>' + (index + 1) + '. ' + entry.initials + ' - ' + entry.score + '</div>';
             });
             leaderboardList.innerHTML = leaderboardHTML;
             leaderboard.style.display = 'block';
             restartPrompt.style.display = 'block';
         }
+
         function resetShip() {
             ship.x = canvas.width / 2;
             ship.y = canvas.height / 2;
             ship.vx = 0;
             ship.vy = 0;
             ship.angle = 0;
-            ship.invulnerable = 120; // 2 seconds of invulnerability
+            ship.invulnerable = 120;
+            ship.hyperspaceCooldown = 0;
+            ship.boosting = false;
+            // Keep power-ups across respawn only if still timed — clear on death already
         }
 
-        // Ambient drift on title (rocks only)
         function updateTitleAmbient(dt) {
             const f = dt * TARGET_FPS;
             asteroids.forEach(asteroid => {
@@ -598,7 +775,6 @@
             });
         }
 
-        // Game update loop (dt in seconds; f scales 60 FPS-tuned values)
         function update(dt) {
             if (gameState.mode === 'title') {
                 updateTitleAmbient(dt);
@@ -607,20 +783,36 @@
             if (gameState.mode !== 'playing' || gameState.gameOver) return;
             const f = dt * TARGET_FPS;
 
-            // Handle input
-            if (isTurningLeft()) {
-                ship.angle -= 0.15 * f;
+            if (gameState.messageTimer > 0) {
+                gameState.messageTimer -= f;
+                if (gameState.messageTimer <= 0) {
+                    gameState.messageTimer = 0;
+                    gameState.message = '';
+                }
             }
-            if (isTurningRight()) {
-                ship.angle += 0.15 * f;
+
+            if (ship.hyperspaceCooldown > 0) {
+                ship.hyperspaceCooldown -= f;
+                if (ship.hyperspaceCooldown < 0) ship.hyperspaceCooldown = 0;
             }
+            if (ship.rapidFire > 0) {
+                ship.rapidFire -= f;
+                if (ship.rapidFire < 0) ship.rapidFire = 0;
+            }
+            if (ship.tripleShot > 0) {
+                ship.tripleShot -= f;
+                if (ship.tripleShot < 0) ship.tripleShot = 0;
+            }
+
+            // Steering
+            if (isTurningLeft()) ship.angle -= 0.15 * f;
+            if (isTurningRight()) ship.angle += 0.15 * f;
+
             if (isBoosting()) {
                 ship.boosting = true;
                 ship.vx += Math.cos(ship.angle) * 0.3 * f;
                 ship.vy += Math.sin(ship.angle) * 0.3 * f;
                 sfxThrust();
-                
-                // Add thruster particles
                 const thrusterX = ship.x - Math.cos(ship.angle) * 15;
                 const thrusterY = ship.y - Math.sin(ship.angle) * 15;
                 if (Math.random() < 0.5 * Math.min(f, 1.5)) {
@@ -636,41 +828,43 @@
             } else {
                 ship.boosting = false;
             }
+
             if (keys['Space']) {
                 if (!keys.spacePressed) {
-                    missiles.push(createMissile(
-                        ship.x + Math.cos(ship.angle) * 12,
-                        ship.y + Math.sin(ship.angle) * 12,
-                        ship.angle
-                    ));
-                    sfxShoot();
+                    firePlayerMissiles();
                     keys.spacePressed = true;
+                } else if (ship.rapidFire > 0) {
+                    // Auto-fire while holding Space during rapid power-up
+                    if (!keys.rapidAcc) keys.rapidAcc = 0;
+                    keys.rapidAcc += f;
+                    if (keys.rapidAcc >= 6) {
+                        keys.rapidAcc = 0;
+                        firePlayerMissiles();
+                    }
                 }
             } else {
                 keys.spacePressed = false;
+                keys.rapidAcc = 0;
             }
 
-            // Update ship
+            // Ship motion
             ship.x += ship.vx * f;
             ship.y += ship.vy * f;
             ship.vx *= Math.pow(0.99, f);
             ship.vy *= Math.pow(0.99, f);
 
-            // Clamp ship speed so continuous boost cannot run away
             const shipSpeed = Math.hypot(ship.vx, ship.vy);
             if (shipSpeed > MAX_SHIP_SPEED) {
                 ship.vx = (ship.vx / shipSpeed) * MAX_SHIP_SPEED;
                 ship.vy = (ship.vy / shipSpeed) * MAX_SHIP_SPEED;
             }
-
             wrap(ship);
-            
+
             if (ship.invulnerable > 0) {
                 ship.invulnerable -= f;
                 if (ship.invulnerable < 0) ship.invulnerable = 0;
             }
 
-            // Update missiles
             missiles = missiles.filter(missile => {
                 missile.x += missile.vx * f;
                 missile.y += missile.vy * f;
@@ -679,10 +873,8 @@
                 return missile.life > 0;
             });
 
-            // Update alien ship
             updateAlienShip(f);
 
-            // Update alien missiles
             alienMissiles = alienMissiles.filter(missile => {
                 missile.x += missile.vx * f;
                 missile.y += missile.vy * f;
@@ -691,7 +883,6 @@
                 return missile.life > 0;
             });
 
-            // Update asteroids
             asteroids.forEach(asteroid => {
                 asteroid.x += asteroid.vx * f;
                 asteroid.y += asteroid.vy * f;
@@ -699,7 +890,14 @@
                 wrap(asteroid);
             });
 
-            // Update particles
+            powerups = powerups.filter(p => {
+                p.x += p.vx * f;
+                p.y += p.vy * f;
+                wrap(p);
+                p.life -= f;
+                return p.life > 0;
+            });
+
             particles = particles.filter(particle => {
                 particle.x += particle.vx * f;
                 particle.y += particle.vy * f;
@@ -707,24 +905,30 @@
                 return particle.life > 0;
             });
 
-            // Collisions: collect removals first (never splice mid-iteration)
+            floatScores = floatScores.filter(fs => {
+                fs.y -= 0.6 * f;
+                fs.life -= f;
+                return fs.life > 0;
+            });
+
+            // --- Collisions ---
             const missilesToRemove = new Set();
             const asteroidsToRemove = new Set();
             const alienMissilesToRemove = new Set();
+            const powerupsToRemove = new Set();
             const splitAsteroids = [];
             let killAlien = false;
+            let alienScore = 0;
+            let alienX = 0;
+            let alienY = 0;
 
             for (let mi = 0; mi < missiles.length; mi++) {
                 if (missilesToRemove.has(mi)) continue;
                 for (let ai = 0; ai < asteroids.length; ai++) {
                     if (asteroidsToRemove.has(ai) || missilesToRemove.has(mi)) continue;
                     if (checkCollision(missiles[mi], asteroids[ai], 2, asteroids[ai].size)) {
-                        gameState.score += 50;
-                        if (asteroids[ai].size <= 15) {
-                            gameState.score += 100;
-                        } else {
-                            gameState.score += 50;
-                        }
+                        const pts = asteroidPoints(asteroids[ai].size);
+                        addScore(pts, asteroids[ai].x, asteroids[ai].y);
                         const pieces = breakAsteroid(asteroids[ai]);
                         if (pieces) splitAsteroids.push(...pieces);
                         sfxExplode();
@@ -738,13 +942,23 @@
                 for (let mi = 0; mi < missiles.length; mi++) {
                     if (missilesToRemove.has(mi)) continue;
                     if (checkCollision(missiles[mi], alienShip, 2, alienShip.size)) {
-                        gameState.score += 500;
-                        createParticles(alienShip.x, alienShip.y, 10);
+                        alienScore = alienShip.scoreValue;
+                        alienX = alienShip.x;
+                        alienY = alienShip.y;
+                        createParticles(alienShip.x, alienShip.y, 12);
                         sfxAlienHit();
                         killAlien = true;
                         missilesToRemove.add(mi);
                         break;
                     }
+                }
+            }
+
+            // Power-up pickups
+            for (let pi = 0; pi < powerups.length; pi++) {
+                if (checkCollision(ship, powerups[pi], ship.size, powerups[pi].size)) {
+                    applyPowerup(powerups[pi].type);
+                    powerupsToRemove.add(pi);
                 }
             }
 
@@ -757,16 +971,16 @@
             if (splitAsteroids.length) {
                 asteroids.push(...splitAsteroids);
             }
+            if (powerupsToRemove.size) {
+                powerups = powerups.filter((_, i) => !powerupsToRemove.has(i));
+            }
             if (killAlien) {
+                addScore(alienScore, alienX, alienY);
                 alienShip = null;
-                setTimeout(() => {
-                    if (gameState.level >= 3 && !gameState.gameOver) {
-                        createAlienShip();
-                    }
-                }, 5000 + Math.random() * 10000);
+                scheduleAlienSpawn(5000, 14000);
             }
 
-            // Ship damage: at most one life lost per frame
+            // Ship damage: one death per frame
             let diedThisFrame = false;
             if (ship.invulnerable === 0 && !gameState.gameOver) {
                 for (let ai = 0; ai < asteroids.length; ai++) {
@@ -774,6 +988,10 @@
                         diedThisFrame = true;
                         break;
                     }
+                }
+                if (!diedThisFrame && alienShip &&
+                    checkCollision(ship, alienShip, ship.size, alienShip.size)) {
+                    diedThisFrame = true;
                 }
                 if (!diedThisFrame) {
                     for (let mi = 0; mi < alienMissiles.length; mi++) {
@@ -788,18 +1006,10 @@
                     alienMissiles = alienMissiles.filter((_, i) => !alienMissilesToRemove.has(i));
                 }
                 if (diedThisFrame) {
-                    gameState.lives--;
-                    createParticles(ship.x, ship.y, 12);
-                    sfxDeath();
-                    if (gameState.lives <= 0) {
-                        endGame();
-                    } else {
-                        resetShip();
-                    }
+                    killShip();
                 }
             }
 
-            // Level clear
             if (asteroids.length === 0 && !gameState.gameOver) {
                 nextLevel();
             }
@@ -807,9 +1017,7 @@
             updateHud();
         }
 
-        // Render function
         function render() {
-            // Clear screen with subtle green tint
             ctx.fillStyle = '#000800';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -817,13 +1025,13 @@
             ctx.fillStyle = '#00ff00';
             ctx.lineWidth = 2;
 
-            // Draw ship (not on title — rocks-only ambiance)
+            // Ship
             if (gameState.mode !== 'title' &&
                 (ship.invulnerable === 0 || Math.floor(ship.invulnerable / 5) % 2)) {
                 ctx.save();
                 ctx.translate(ship.x, ship.y);
                 ctx.rotate(ship.angle);
-                
+
                 ctx.beginPath();
                 ctx.moveTo(12, 0);
                 ctx.lineTo(-8, -6);
@@ -832,7 +1040,6 @@
                 ctx.closePath();
                 ctx.stroke();
 
-                // Draw thruster
                 if (ship.boosting) {
                     ctx.beginPath();
                     ctx.moveTo(-4, 0);
@@ -841,42 +1048,51 @@
                     ctx.closePath();
                     ctx.stroke();
                 }
-                
+
+                // Shield ring while invulnerable power / respawn
+                if (ship.invulnerable > 40) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.45)';
+                    ctx.stroke();
+                    ctx.strokeStyle = '#00ff00';
+                }
+
                 ctx.restore();
             }
 
-            // Draw missiles
+            // Missiles
             missiles.forEach(missile => {
                 ctx.beginPath();
                 ctx.arc(missile.x, missile.y, 2, 0, Math.PI * 2);
                 ctx.fill();
             });
 
-            // Draw alien ship
+            // Alien
             if (alienShip) {
                 ctx.save();
                 ctx.translate(alienShip.x, alienShip.y);
-                
-                // Draw UFO-like shape
+                const sx = alienShip.type === 'small' ? 0.65 : 1;
+                ctx.scale(sx, sx);
+
                 ctx.beginPath();
                 ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
                 ctx.stroke();
-                
+
                 ctx.beginPath();
                 ctx.ellipse(0, -2, 8, 3, 0, 0, Math.PI * 2);
                 ctx.stroke();
-                
-                // Draw some details
+
                 ctx.beginPath();
                 ctx.arc(-6, 0, 1, 0, Math.PI * 2);
                 ctx.arc(0, 0, 1, 0, Math.PI * 2);
                 ctx.arc(6, 0, 1, 0, Math.PI * 2);
                 ctx.fill();
-                
+
                 ctx.restore();
             }
 
-            // Draw alien missiles
+            // Alien missiles
             alienMissiles.forEach(missile => {
                 ctx.fillStyle = '#ff4444';
                 ctx.beginPath();
@@ -885,41 +1101,99 @@
                 ctx.fillStyle = '#00ff00';
             });
 
-            // Draw asteroids (unique vertex radii per rock)
+            // Asteroids
             asteroids.forEach(asteroid => {
                 ctx.save();
                 ctx.translate(asteroid.x, asteroid.y);
                 ctx.rotate(asteroid.rotation);
-                
+
                 const radii = asteroid.vertices || [asteroid.size];
                 const points = radii.length;
                 ctx.beginPath();
                 for (let i = 0; i < points; i++) {
                     const angle = (i / points) * Math.PI * 2;
                     const radius = radii[i];
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
-                    
-                    if (i === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
+                    const px = Math.cos(angle) * radius;
+                    const py = Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
                 }
                 ctx.closePath();
                 ctx.stroke();
-                
                 ctx.restore();
             });
 
-            // Draw particles
+            // Power-ups
+            powerups.forEach(p => {
+                const blink = Math.floor(performance.now() / 120) % 2;
+                if (!blink && p.life < 90) return;
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.strokeStyle = '#00ff88';
+                ctx.beginPath();
+                ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = '#00ff88';
+                ctx.font = '10px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const label = p.type === 'shield' ? 'S' : (p.type === 'rapid' ? 'R' : 'T');
+                ctx.fillText(label, 0, 1);
+                ctx.restore();
+                ctx.strokeStyle = '#00ff00';
+                ctx.fillStyle = '#00ff00';
+            });
+
+            // Particles
             particles.forEach(particle => {
                 const alpha = particle.life / particle.maxLife;
-                ctx.fillStyle = `rgba(0, 255, 0, ${alpha})`;
+                ctx.fillStyle = 'rgba(0, 255, 0, ' + alpha + ')';
                 ctx.fillRect(particle.x, particle.y, 2, 2);
             });
 
-            // Title overlay
+            // Floating scores
+            floatScores.forEach(fs => {
+                const alpha = fs.life / fs.maxLife;
+                ctx.fillStyle = 'rgba(0, 255, 0, ' + alpha + ')';
+                ctx.font = '12px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('+' + fs.pts, fs.x, fs.y);
+            });
+            ctx.textAlign = 'left';
+
+            // HUD extras on canvas
+            if (gameState.mode === 'playing' || gameState.mode === 'paused') {
+                ctx.font = '12px "Courier New", monospace';
+                ctx.fillStyle = '#00aa00';
+                let hudY = 20;
+                if (ship.hyperspaceCooldown > 0) {
+                    ctx.fillText('HS COOLDOWN', canvas.width - 120, hudY);
+                    hudY += 16;
+                }
+                if (ship.rapidFire > 0) {
+                    ctx.fillText('RAPID', canvas.width - 120, hudY);
+                    hudY += 16;
+                }
+                if (ship.tripleShot > 0) {
+                    ctx.fillText('TRIPLE', canvas.width - 120, hudY);
+                }
+            }
+
+            // Center message
+            if (gameState.message && gameState.messageTimer > 0 && gameState.mode === 'playing') {
+                ctx.fillStyle = '#00ff00';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 28px "Courier New", monospace';
+                ctx.shadowColor = '#00ff00';
+                ctx.shadowBlur = 10;
+                ctx.fillText(gameState.message, canvas.width / 2, canvas.height / 2 - 80);
+                ctx.shadowBlur = 0;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+            }
+
+            // Title
             if (gameState.mode === 'title') {
                 ctx.fillStyle = 'rgba(0, 8, 0, 0.55)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -935,8 +1209,7 @@
                 ctx.fillText('CRT EDITION', canvas.width / 2, canvas.height / 2 + 10);
                 ctx.font = '16px "Courier New", monospace';
                 ctx.shadowBlur = 6;
-                const blink = Math.floor(performance.now() / 500) % 2;
-                if (blink) {
+                if (Math.floor(performance.now() / 500) % 2) {
                     ctx.fillText('PRESS ANY KEY', canvas.width / 2, canvas.height / 2 + 60);
                 }
                 ctx.shadowBlur = 0;
@@ -944,7 +1217,7 @@
                 ctx.textBaseline = 'alphabetic';
             }
 
-            // Pause overlay
+            // Pause
             if (gameState.mode === 'paused') {
                 ctx.fillStyle = 'rgba(0, 8, 0, 0.45)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -964,12 +1237,11 @@
             }
         }
 
-        // Game loop with delta time (capped after tab blur)
         function gameLoop(timestamp) {
             if (!lastFrameTime) lastFrameTime = timestamp;
             let dt = (timestamp - lastFrameTime) / 1000;
             lastFrameTime = timestamp;
-            if (dt > 0.05) dt = 0.05; // max ~20 FPS equivalent step
+            if (dt > 0.05) dt = 0.05;
             if (dt < 0) dt = 0;
 
             update(dt);
@@ -977,32 +1249,7 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Restart game (from game over → playing)
-        function restartGame() {
-            gameState = {
-                mode: 'playing',
-                lives: 3,
-                score: 0,
-                level: 1,
-                gameOver: false,
-                enteringInitials: false,
-                initials: '',
-                leaderboard: loadLeaderboard()
-            };
-            missiles = [];
-            particles = [];
-            alienShip = null;
-            alienMissiles = [];
-            resetShip();
-            createAsteroids();
-            gameOverElement.style.display = 'none';
-            initialsPrompt.style.display = 'none';
-            leaderboard.style.display = 'none';
-            restartPrompt.style.display = 'block';
-            updateHud();
-        }
-
-        // Initialize: title screen with drifting rocks
+        // Boot: title with drifting rocks
         createAsteroids();
         resetShip();
         ship.invulnerable = 0;
