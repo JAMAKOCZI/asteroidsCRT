@@ -5,6 +5,8 @@
 **Approach:** A — Arcade polish (single-file `index.html`)  
 **Status:** Approved for implementation
 
+> **Superseded product scope:** Implemented features beyond this note’s “out of scope” list include hyperspace, dual saucers, power-ups (shield/rapid/triple), hangar CRT chrome, and extra-life scoring. Treat this file as an historical design note, not current feature freeze.
+
 ## Goal
 
 Stabilize classic Asteroids gameplay, restore familiar controls and frame-rate independence, then add title screen, pause, and Web Audio — without splitting into modules or adding mobile/hyperspace/power-ups.

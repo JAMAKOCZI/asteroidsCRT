@@ -277,6 +277,13 @@
             100% { transform: translate(-8px, -80px); opacity: 0; }
         }
 
+        @media (prefers-reduced-motion: reduce) {
+            .hangar-dust i {
+                animation: none !important;
+                opacity: 0.3;
+            }
+        }
+
         /*
          * Lamps are children of .beam — hang from underside via short stem.
          * Cones move with the fixtures.
@@ -350,8 +357,8 @@
                 100% 100%,
                 0% 100%
             );
-            filter: blur(12px);
-            opacity: 0.92;
+            /* Soft edges via gradient stops only (no live blur — cheaper on iGPU) */
+            opacity: 0.88;
             pointer-events: none;
             z-index: -1;
         }
@@ -445,14 +452,31 @@
             pointer-events: auto;
         }
 
-        /* Full original screen size (800×600 canvas + bezel) — no forced shrink */
-        .crt-computer {
+        /*
+         * Layout slot sized to the *scaled* CRT so overflow:hidden hangar does not
+         * clip a full-size box that was only visually shrunk with transform.
+         * JS sets width/height and --crt-scale (see setupCrtFit).
+         */
+        .crt-fit {
             position: relative;
+            z-index: 6;
+            flex-shrink: 0;
+            /* Pre-JS fallback so absolute CRT still has a box */
+            width: min(97vw, 920px);
+            height: min(78vh, 740px);
+        }
+
+        /* Full original screen size (800×600 canvas + bezel); scale from bottom */
+        .crt-computer {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             z-index: 6;
-            transform: none;
+            transform: translateX(-50%) scale(var(--crt-scale, 1));
+            transform-origin: bottom center;
             margin-bottom: -1px;
             filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.45));
         }
@@ -469,35 +493,6 @@
             z-index: 5;
             pointer-events: none;
             filter: blur(2px);
-        }
-
-        /*
-         * Only scale when the viewport is too small to fit the full CRT.
-         * Origin at bottom so the base stays on the desk.
-         */
-        @media (max-width: 920px) {
-            .crt-computer {
-                transform: scale(0.9);
-                transform-origin: bottom center;
-            }
-        }
-        @media (max-width: 800px) {
-            .crt-computer {
-                transform: scale(0.75);
-                transform-origin: bottom center;
-            }
-        }
-        @media (max-height: 820px) {
-            .crt-computer {
-                transform: scale(0.9);
-                transform-origin: bottom center;
-            }
-        }
-        @media (max-height: 700px) {
-            .crt-computer {
-                transform: scale(0.75);
-                transform-origin: bottom center;
-            }
         }
 
         .desk {
@@ -1143,6 +1138,7 @@
 
         <!-- CRT + desk one stack: base rests on desk top edge -->
         <div class="assembly">
+            <div class="crt-fit">
             <div class="crt-computer">
                 <div class="crt-case">
                     <div class="crt-grain" aria-hidden="true"></div>
@@ -1158,14 +1154,16 @@
                     <div class="crt-screen-well">
                         <div class="crt-screen-lip">
                             <div class="crt-screen">
-                                <canvas id="gameCanvas" width="800" height="600"></canvas>
-                                <div class="crt-overlay"></div>
-                                <div class="ui">
+                                <canvas id="gameCanvas" width="800" height="600"
+                                    role="img"
+                                    aria-label="Asteroids game. A/D or arrows turn, W or Up boost, Space fire, H or Down hyperspace, P pause."></canvas>
+                                <div class="crt-overlay" aria-hidden="true"></div>
+                                <div class="ui" aria-live="polite" aria-atomic="true">
                                     <div>SHIPS: <span id="lives">3</span></div>
                                     <div>SCORE: <span id="score">0</span></div>
                                     <div>LEVEL: <span id="level">1</span></div>
                                 </div>
-                                <div class="controls">
+                                <div class="controls" aria-hidden="true">
                                     LEFT/RIGHT or A/D: Turn<br>
                                     UP / W: Boost<br>
                                     SPACE: Fire<br>
@@ -1177,7 +1175,7 @@
                                     <div id="initialsPrompt" style="display: none; font-size: 16px; margin-top: 20px;">
                                         <div>HIGH SCORE! Enter your initials:</div>
                                         <div style="font-size: 24px; margin: 10px 0; letter-spacing: 4px;" id="initialsDisplay">___</div>
-                                        <div style="font-size: 12px;">Use A-Z keys, Enter to confirm</div>
+                                        <div style="font-size: 12px;">A–Z, Enter to save · Esc to skip</div>
                                     </div>
                                     <div id="leaderboard" style="display: none; font-size: 14px; margin-top: 20px;">
                                         <div style="font-size: 18px; margin-bottom: 15px;">HIGH SCORES</div>
@@ -1212,6 +1210,7 @@
                 <div class="crt-base" aria-hidden="true"></div>
                 <div class="crt-desk-shadow" aria-hidden="true"></div>
             </div>
+            </div><!-- .crt-fit -->
 
             <div class="desk" aria-hidden="true">
                 <div class="desk-top-edge"></div>
@@ -1248,7 +1247,21 @@
         function loadLeaderboard() {
             try {
                 const data = JSON.parse(localStorage.getItem('asteroidsLeaderboard') || '[]');
-                return Array.isArray(data) ? data : [];
+                if (!Array.isArray(data)) return [];
+                return data
+                    .map(function (row) {
+                        if (!row || typeof row !== 'object') return null;
+                        const initials = String(row.initials || '')
+                            .toUpperCase()
+                            .replace(/[^A-Z]/g, '')
+                            .slice(0, 3);
+                        const score = Number(row.score);
+                        if (!initials || !Number.isFinite(score) || score < 0) return null;
+                        return { initials: initials, score: Math.floor(score) };
+                    })
+                    .filter(Boolean)
+                    .sort(function (a, b) { return b.score - a.score; })
+                    .slice(0, 10);
             } catch (e) {
                 return [];
             }
@@ -1264,7 +1277,8 @@
             if (score <= 0) return false;
             const board = gameState.leaderboard;
             if (board.length < 10) return true;
-            return score > board[board.length - 1].score;
+            // Ties with the 10th place still qualify
+            return score >= board[board.length - 1].score;
         }
 
         // Game state — mode: title | playing | paused | gameover
@@ -1349,6 +1363,33 @@
 
         // --- Input ---
         const keys = {};
+
+        function clearHeldKeys() {
+            for (const k of Object.keys(keys)) {
+                keys[k] = false;
+            }
+            keys.spacePressed = false;
+            keys.rapidAcc = 0;
+        }
+
+        function isModifierOnlyOrBrowserChord(e) {
+            if (e.metaKey || e.ctrlKey || e.altKey) return true;
+            const c = e.code;
+            return (
+                c === 'Tab' ||
+                c === 'Escape' ||
+                c === 'CapsLock' ||
+                c === 'NumLock' ||
+                c === 'ScrollLock' ||
+                c === 'ShiftLeft' || c === 'ShiftRight' ||
+                c === 'ControlLeft' || c === 'ControlRight' ||
+                c === 'AltLeft' || c === 'AltRight' ||
+                c === 'MetaLeft' || c === 'MetaRight' ||
+                c === 'ContextMenu' ||
+                (c.length >= 2 && c[0] === 'F' && c[1] >= '0' && c[1] <= '9')
+            );
+        }
+
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
             if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' ||
@@ -1357,6 +1398,7 @@
             }
 
             if (gameState.mode === 'title') {
+                if (isModifierOnlyOrBrowserChord(e)) return;
                 ensureAudio();
                 startGame();
                 return;
@@ -1384,6 +1426,10 @@
         });
         document.addEventListener('keyup', (e) => {
             keys[e.code] = false;
+        });
+        window.addEventListener('blur', clearHeldKeys);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) clearHeldKeys();
         });
 
         function isBoosting() {
@@ -1506,13 +1552,28 @@
             };
         }
 
+        // In-game countdown (frames @ TARGET_FPS). Decrements only while playing,
+        // so pause freezes it and restarts replace the schedule instead of stacking.
+        let alienSpawnTimer = 0;
+
         function scheduleAlienSpawn(minMs, maxMs) {
-            const delay = minMs + Math.random() * (maxMs - minMs);
-            setTimeout(() => {
-                if (gameState.mode === 'playing' && !gameState.gameOver && !alienShip && gameState.level >= 2) {
-                    createAlienShip();
-                }
-            }, delay);
+            if (gameState.level < 2) {
+                alienSpawnTimer = 0;
+                return;
+            }
+            const minF = (minMs / 1000) * TARGET_FPS;
+            const maxF = (maxMs / 1000) * TARGET_FPS;
+            alienSpawnTimer = minF + Math.random() * (maxF - minF);
+        }
+
+        function tickAlienSpawn(f) {
+            if (alienShip || gameState.level < 2) return;
+            if (alienSpawnTimer <= 0) return;
+            alienSpawnTimer -= f;
+            if (alienSpawnTimer <= 0) {
+                alienSpawnTimer = 0;
+                createAlienShip();
+            }
         }
 
         function updateAlienShip(f) {
@@ -1573,11 +1634,12 @@
         }
 
         function createMissile(x, y, angle) {
+            // Classic Asteroids: shots inherit ship velocity so they leave the nose at speed
             return {
                 x: x,
                 y: y,
-                vx: Math.cos(angle) * 8,
-                vy: Math.sin(angle) * 8,
+                vx: Math.cos(angle) * 8 + ship.vx,
+                vy: Math.sin(angle) * 8 + ship.vy,
                 life: 60
             };
         }
@@ -1597,10 +1659,10 @@
         }
 
         function wrap(obj) {
-            if (obj.x < 0) obj.x = canvas.width;
-            if (obj.x > canvas.width) obj.x = 0;
-            if (obj.y < 0) obj.y = canvas.height;
-            if (obj.y > canvas.height) obj.y = 0;
+            const w = canvas.width;
+            const h = canvas.height;
+            obj.x = ((obj.x % w) + w) % w;
+            obj.y = ((obj.y % h) + h) % h;
         }
 
         function checkCollision(obj1, obj2, radius1, radius2) {
@@ -1733,11 +1795,10 @@
             alienShip = null;
             alienMissiles = [];
             powerups = [];
-            createAsteroids();
+            // Center ship first so asteroid safe-radius is around the spawn point
             resetShip();
-            if (gameState.level >= 2) {
-                scheduleAlienSpawn(2000, 4000);
-            }
+            createAsteroids();
+            scheduleAlienSpawn(2000, 4000);
         }
 
         function endGame() {
@@ -1780,6 +1841,7 @@
             floatScores = [];
             alienShip = null;
             alienMissiles = [];
+            alienSpawnTimer = 0;
         }
 
         function startGame() {
@@ -1793,6 +1855,7 @@
             restartPrompt.style.display = 'block';
             showMessage('PLAYER 1', 80);
             updateHud();
+            // Level 1: no saucers until level 2 (schedule is a no-op below level 2)
             scheduleAlienSpawn(8000, 14000);
         }
 
@@ -1817,9 +1880,17 @@
         }
 
         function handleInitialsInput(e) {
+            if (e.code === 'Escape') {
+                e.preventDefault();
+                gameState.initials = '';
+                showLeaderboard();
+                return;
+            }
             if (e.code === 'Enter') {
                 if (gameState.initials.length === 3) {
                     saveHighScore();
+                    showLeaderboard();
+                } else if (gameState.initials.length === 0) {
                     showLeaderboard();
                 }
             } else if (e.code === 'Backspace') {
@@ -1827,7 +1898,7 @@
                 updateInitialsDisplay();
             } else if (gameState.initials.length < 3) {
                 const key = e.key.toUpperCase();
-                if (key >= 'A' && key <= 'Z') {
+                if (key.length === 1 && key >= 'A' && key <= 'Z') {
                     gameState.initials += key;
                     updateInitialsDisplay();
                 }
@@ -1853,11 +1924,12 @@
             gameState.enteringInitials = false;
             initialsPrompt.style.display = 'none';
 
-            let leaderboardHTML = '';
+            leaderboardList.textContent = '';
             gameState.leaderboard.forEach((entry, index) => {
-                leaderboardHTML += '<div>' + (index + 1) + '. ' + entry.initials + ' - ' + entry.score + '</div>';
+                const row = document.createElement('div');
+                row.textContent = (index + 1) + '. ' + entry.initials + ' - ' + entry.score;
+                leaderboardList.appendChild(row);
             });
-            leaderboardList.innerHTML = leaderboardHTML;
             leaderboard.style.display = 'block';
             restartPrompt.style.display = 'block';
         }
@@ -1891,6 +1963,8 @@
             }
             if (gameState.mode !== 'playing' || gameState.gameOver) return;
             const f = dt * TARGET_FPS;
+
+            tickAlienSpawn(f);
 
             if (gameState.messageTimer > 0) {
                 gameState.messageTimer -= f;
@@ -2319,7 +2393,7 @@
                 ctx.font = '16px "Courier New", monospace';
                 ctx.shadowBlur = 6;
                 if (Math.floor(performance.now() / 500) % 2) {
-                    ctx.fillText('PRESS ANY KEY', canvas.width / 2, canvas.height / 2 + 60);
+                    ctx.fillText('PRESS A KEY', canvas.width / 2, canvas.height / 2 + 60);
                 }
                 ctx.shadowBlur = 0;
                 ctx.textAlign = 'left';
@@ -2358,11 +2432,58 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // Scale CRT layout slot to viewport (transform alone does not shrink layout)
+        (function setupCrtFit() {
+            const fit = document.querySelector('.crt-fit');
+            const computer = document.querySelector('.crt-computer');
+            if (!fit || !computer) return;
+
+            let nativeW = 0;
+            let nativeH = 0;
+
+            function measureNative() {
+                // Measure at scale 1; getBoundingClientRect includes transforms
+                fit.style.setProperty('--crt-scale', '1');
+                fit.style.width = 'auto';
+                fit.style.height = 'auto';
+                computer.style.position = 'relative';
+                computer.style.left = 'auto';
+                computer.style.bottom = 'auto';
+                computer.style.transform = 'none';
+                const r = computer.getBoundingClientRect();
+                nativeW = r.width;
+                nativeH = r.height;
+                computer.style.position = '';
+                computer.style.left = '';
+                computer.style.bottom = '';
+                computer.style.transform = '';
+            }
+
+            function fitCrtToViewport() {
+                if (!nativeW || !nativeH) measureNative();
+                if (!nativeW || !nativeH) return;
+                // Desk + apron sit under the CRT; leave room so they stay on-screen
+                const deskReserve = 110;
+                const availW = window.innerWidth * 0.96;
+                const availH = Math.max(160, window.innerHeight - deskReserve - 20);
+                const s = Math.min(1, availW / nativeW, availH / nativeH);
+                fit.style.setProperty('--crt-scale', String(s));
+                fit.style.width = Math.round(nativeW * s) + 'px';
+                fit.style.height = Math.round(nativeH * s) + 'px';
+            }
+
+            requestAnimationFrame(function () {
+                measureNative();
+                fitCrtToViewport();
+            });
+            window.addEventListener('resize', fitCrtToViewport);
+        })();
+
         // Boot: title with drifting rocks
         createAsteroids();
         resetShip();
         ship.invulnerable = 0;
-        gameLoop();
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>

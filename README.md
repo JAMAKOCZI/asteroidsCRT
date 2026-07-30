@@ -4,6 +4,8 @@ Classic **Asteroids**-style arcade game in the browser, with a green CRT / vecto
 
 **Play:** open [`index.html`](index.html) in a modern browser (Chrome, Firefox, Edge). No build step.
 
+**Desktop keyboard only** — no touch / mobile controls.
+
 Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/asteroidsCRT)
 
 ---
@@ -30,9 +32,10 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 | **Space** | Fire (hold for auto-fire with Rapid) |
 | **H** or **Down** | Hyperspace (risky teleport; cooldown) |
 | **P** | Pause / resume |
-| **Any key** | Start from title screen |
+| **A key** (not Tab/modifiers) | Start from title screen |
 | **R** | Restart (after game over) |
 | **A–Z**, **Enter** | Enter high-score initials |
+| **Esc** | Skip high-score entry |
 
 ---
 
