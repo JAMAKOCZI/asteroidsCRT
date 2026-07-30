@@ -2593,8 +2593,8 @@
             }
             createParticles(asteroid.x, asteroid.y, 6);
 
-            // Drops: 14% large, 4% medium — never in attract / no-power challenge
-            if (gameState.challenge !== 'nopu' && !gameState.isAttract && gameState.mode === 'playing') {
+            // Drops: 14% large, 4% medium (also in attract/idle demo)
+            if (gameState.challenge !== 'nopu') {
                 let dropChance = 0;
                 if (asteroid.size > 30) dropChance = 0.14;
                 else if (asteroid.size > 15) dropChance = 0.04;
@@ -2606,8 +2606,7 @@
         }
 
         function spawnPowerup(x, y) {
-            // Idle/attract and challenge lock — hard block
-            if (gameState.challenge === 'nopu' || gameState.isAttract || gameState.mode === 'attract') return;
+            if (gameState.challenge === 'nopu') return;
             const types = ['shield', 'rapid', 'triple', 'wide', 'slow'];
             // Nudge away from ship so a kill under the nose does not auto-collect instantly
             let dx = x - ship.x;
@@ -2894,12 +2893,12 @@
 
         function beginAttractRun() {
             // Same rules as a normal run: level 1, 3 lives, phosphor by level (starts green)
+            // Power-ups drop and work here like in a real match
             titleIdleSec = 0;
             gameState = freshRunState('attract', { attract: true });
             runStats = freshRunStats();
             recordingTrail = [];
             clearWorld();
-            powerups = []; // never show power-ups in idle demo
             setRngSeed(null);
             applyCrtTheme(1);
             resetShip();
@@ -3449,44 +3448,17 @@
             ctx.fillStyle = crtTheme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Hard reset draw state every frame (prevents leaked dash/alpha artifacts)
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
             ctx.strokeStyle = ink;
             ctx.fillStyle = ink;
             ctx.lineWidth = 2;
+            ctx.shadowBlur = 0;
 
-            // Ghost trail from last real run (dots only; break on wrap so we never draw
-            // long chords across the screen when the ship teleported edges)
-            if ((gameState.mode === 'playing' || gameState.mode === 'paused') &&
-                ghostTrail && ghostTrail.length > 1) {
-                ctx.save();
-                ctx.fillStyle = crtRgba(0.12);
-                ctx.strokeStyle = crtRgba(0.2);
-                ctx.lineWidth = 1;
-                const wrapJumpX = canvas.width * 0.45;
-                const wrapJumpY = canvas.height * 0.45;
-                for (let gi = 0; gi < ghostTrail.length; gi += 2) {
-                    const gp = ghostTrail[gi];
-                    if (gi > 0) {
-                        const prev = ghostTrail[gi - 1];
-                        if (Math.abs(gp.x - prev.x) > wrapJumpX || Math.abs(gp.y - prev.y) > wrapJumpY) {
-                            continue;
-                        }
-                    }
-                    ctx.fillRect(gp.x - 0.5, gp.y - 0.5, 1.5, 1.5);
-                }
-                // Faint ghost ship at end of trail
-                const last = ghostTrail[ghostTrail.length - 1];
-                ctx.translate(last.x, last.y);
-                ctx.rotate(last.a || 0);
-                ctx.globalAlpha = 0.22;
-                ctx.beginPath();
-                ctx.moveTo(10, 0);
-                ctx.lineTo(-7, -5);
-                ctx.lineTo(-4, 0);
-                ctx.lineTo(-7, 5);
-                ctx.closePath();
-                ctx.stroke();
-                ctx.restore();
-            }
+            // Ghost trail intentionally not drawn: wrap discontinuities produced long
+            // faint chords across the playfield (looked like a broken geometric shape
+            // even after restart, via localStorage). Trail is still recorded/saved.
 
             // Ship
             if (gameState.mode !== 'title' &&
@@ -3597,30 +3569,25 @@
                 ctx.restore();
             });
 
-            // Power-ups — diamond + letter (high visibility on phosphor CRT)
+            // Power-ups — circle + letter (readable, no dashed-line state leaks)
             powerups.forEach(p => {
-                // Blink only when about to expire
                 if (p.life < 90 && Math.floor(performance.now() / 100) % 2 === 0) return;
-                const pulse = 1 + 0.08 * Math.sin(performance.now() / 140);
-                const r = p.size * pulse;
+                const pulse = 1 + 0.06 * Math.sin(performance.now() / 160);
+                const r = (p.size || 12) * pulse;
                 ctx.save();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
                 ctx.translate(p.x, p.y);
                 ctx.strokeStyle = ink;
                 ctx.fillStyle = ink;
                 ctx.shadowColor = ink;
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = 10;
                 ctx.lineWidth = 2;
-                // Outer diamond
                 ctx.beginPath();
-                ctx.moveTo(0, -r);
-                ctx.lineTo(r, 0);
-                ctx.lineTo(0, r);
-                ctx.lineTo(-r, 0);
-                ctx.closePath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
                 ctx.stroke();
-                // Inner circle
                 ctx.beginPath();
-                ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+                ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.font = 'bold 12px "Courier New", monospace';
                 ctx.textAlign = 'center';
@@ -3631,22 +3598,21 @@
                     : p.type === 'wide' ? 'W'
                     : 'L';
                 ctx.fillText(label, 0, 1);
-                // Grace period: dashed ring so you can see it before pickup
+                // Solid ring while not yet collectible (no setLineDash — was leaking draw state)
                 if (p.pickupDelay > 0) {
-                    ctx.setLineDash([3, 3]);
-                    ctx.globalAlpha = 0.55;
+                    ctx.globalAlpha = 0.45;
                     ctx.beginPath();
-                    ctx.arc(0, 0, r + 6, 0, Math.PI * 2);
+                    ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
                     ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.globalAlpha = 1;
                 }
-                ctx.shadowBlur = 0;
-                ctx.lineWidth = 2;
                 ctx.restore();
-                ctx.strokeStyle = ink;
-                ctx.fillStyle = ink;
             });
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = ink;
+            ctx.fillStyle = ink;
 
             // Particles
             particles.forEach(particle => {
