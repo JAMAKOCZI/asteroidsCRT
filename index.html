@@ -2732,6 +2732,7 @@
             resetCombo();
 
             // Attract uses the same life rules as a real run (3 lives, keep level/color)
+            if (!gameState.isAttract) runStats.deaths++;
             gameState.lives--;
             updateHud();
             if (gameState.lives <= 0) {
