@@ -24,7 +24,7 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 
 | Key | Action |
 |-----|--------|
-| **Left / Right** | Turn |
+| **Left / Right** or **A / D** | Turn |
 | **Up / W** | Boost / thrust (Tab also works) |
 | **Space** | Fire |
 | **P** | Pause / resume |

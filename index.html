@@ -93,7 +93,7 @@
             <div>LEVEL: <span id="level">1</span></div>
         </div>
         <div class="controls">
-            LEFT/RIGHT: Turn<br>
+            LEFT/RIGHT or A/D: Turn<br>
             UP / W: Boost<br>
             SPACE: Fire<br>
             P: Pause
@@ -267,6 +267,14 @@
 
         function isBoosting() {
             return !!(keys['ArrowUp'] || keys['KeyW'] || keys['Tab']);
+        }
+
+        function isTurningLeft() {
+            return !!(keys['ArrowLeft'] || keys['KeyA']);
+        }
+
+        function isTurningRight() {
+            return !!(keys['ArrowRight'] || keys['KeyD']);
         }
 
         // Random irregular outline for each asteroid (cached radii)
@@ -600,10 +608,10 @@
             const f = dt * TARGET_FPS;
 
             // Handle input
-            if (keys['ArrowLeft']) {
+            if (isTurningLeft()) {
                 ship.angle -= 0.15 * f;
             }
-            if (keys['ArrowRight']) {
+            if (isTurningRight()) {
                 ship.angle += 0.15 * f;
             }
             if (isBoosting()) {
