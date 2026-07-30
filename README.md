@@ -4,9 +4,10 @@ Classic **Asteroids**-style arcade game in the browser, with a CRT hangar look.
 
 ![Asteroids CRT preview — vector game on a beige CRT in a hangar](docs/media/asteroids-crt-preview.jpg)
 
-**Play:** open [`index.html`](index.html) in a modern browser (Chrome, Firefox, Edge). Prefer a local server so `game-logic.js` loads (see below).
+**Play:** open [`index.html`](index.html) in a modern browser (Chrome, Firefox, Edge).  
+**No build step, no npm, no server required** — one self-contained file.
 
-**Best on desktop keyboard.** No full touch controls (layout still scales on small screens).
+**Best on desktop keyboard.** No full touch controls (layout still scales on small screens; tap can start / exit demo).
 
 Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/asteroidsCRT)
 
@@ -54,54 +55,34 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 
 ## How to run
 
-### Local file
+1. Clone or download the repo.
+2. Double-click [`index.html`](index.html) (or drag it into a browser window).
 
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/JAMAKOCZI/asteroidsCRT.git
-   cd asteroidsCRT
-   ```
-2. Open `index.html` in your browser (double-click or drag into a window).
-
-> If the browser blocks loading `game-logic.js` from `file://`, use a local server (below). The game falls back to inline helpers if the script is missing.
-
-### Simple local server (recommended)
+Optional local server (only if you prefer):
 
 ```bash
-# Python 3
 python -m http.server 8080
 ```
-
-Then open [http://localhost:8080](http://localhost:8080).
-
----
-
-## Tests
-
-Pure gameplay helpers live in [`game-logic.js`](game-logic.js) and are covered by Node’s built-in test runner (no install):
-
-```bash
-npm test
-# or
-node --test test/game-logic.test.js
-```
-
-Covers wrap, phosphor cycle, combo mult, high-score eligibility, daily seed stability, spawn delay math, leaderboard sanitization, and more.
 
 ---
 
 ## Tech
 
-- Browser: `index.html` + `game-logic.js` (HTML / CSS / Canvas 2D / vanilla JS)
-- No bundler, no runtime dependencies
-- High scores: `localStorage` (classic / daily / challenge keys)
-- Logic shared with Node tests via `game-logic.js`
+- **One playable file:** `index.html` (HTML + CSS + Canvas 2D + vanilla JS)
+- No dependencies, no bundler, no npm for playing
+- High scores: browser `localStorage`
+
+Optional developer copy of pure helpers (not needed to play): [`game-logic.js`](game-logic.js) + [`test/game-logic.test.js`](test/game-logic.test.js). If you have Node installed:
+
+```bash
+node --test test/game-logic.test.js
+```
 
 ---
 
 ## Project status
 
-Full arcade build (phases 1–4): juice/CRT, depth mechanics, meta modes, and quality packaging.  
+Arcade build (phases 1–4): juice/CRT, depth, meta modes, packaging.  
 Roadmap: [`docs/superpowers/specs/2026-07-30-asteroids-four-phase-roadmap.md`](docs/superpowers/specs/2026-07-30-asteroids-four-phase-roadmap.md).
 
 ---

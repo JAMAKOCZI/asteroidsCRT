@@ -1378,14 +1378,7 @@
         </div>
     </div>
 
-    <script src="game-logic.js"></script>
     <script>
-        // Shared pure helpers (Node-tested). Fallback only if file failed to load.
-        const L = (typeof AsteroidsLogic !== 'undefined') ? AsteroidsLogic : null;
-        if (!L) {
-            console.error('AsteroidsLogic missing — open via a local server so game-logic.js loads.');
-        }
-
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const livesElement = document.getElementById('lives');
@@ -1407,31 +1400,31 @@
         const restartPrompt = document.getElementById('restartPrompt');
 
         const MAX_SHIP_SPEED = 8;
-        const TARGET_FPS = L ? L.TARGET_FPS : 60;
-        const EXTRA_LIFE_EVERY = L ? L.EXTRA_LIFE_EVERY : 10000;
+        const TARGET_FPS = 60;
+        const EXTRA_LIFE_EVERY = 10000;
         const MAX_MISSILES = 4;
         const MAX_MISSILES_RAPID = 7;
-        const HYPERSPACE_COOLDOWN = L ? L.HYPERSPACE_COOLDOWN : 180;
-        const HYPERSPACE_SAFE_COOLDOWN = L ? L.HYPERSPACE_SAFE_COOLDOWN : 320;
-        const HYPERSPACE_HOLD_FRAMES = L ? L.HYPERSPACE_HOLD_FRAMES : 28;
-        const COMBO_WINDOW = L ? L.COMBO_WINDOW : 110;
-        const COMBO_MAX_MULT = L ? L.COMBO_MAX_MULT : 5;
-        const BOSS_LEVEL_INTERVAL = L ? L.BOSS_LEVEL_INTERVAL : 5;
+        const HYPERSPACE_COOLDOWN = 180;
+        const HYPERSPACE_SAFE_COOLDOWN = 320;
+        const HYPERSPACE_HOLD_FRAMES = 28;
+        const COMBO_WINDOW = 110;
+        const COMBO_MAX_MULT = 5;
+        const BOSS_LEVEL_INTERVAL = 5;
         const ATTRACT_IDLE_SEC = 28;
-        const SURVIVE_GOAL_SEC = L ? L.SURVIVE_GOAL_SEC : 120;
+        const SURVIVE_GOAL_SEC = 120;
         const GHOST_STORAGE_KEY = 'asteroidsGhostTrail';
         const GHOST_SAMPLE_SEC = 0.1;
         const GHOST_MAX_POINTS = 500;
 
-        const CHALLENGE_OPTS = L ? L.CHALLENGE_OPTS : [
+        const CHALLENGE_OPTS = [
             { id: 'none', label: 'NONE' },
             { id: 'nohs', label: 'NO HYPER' },
             { id: 'nopu', label: 'NO POWER' },
             { id: 'survive', label: 'SURVIVE 2:00' }
         ];
 
-        // Classic CRT phosphor palette — cycles every 8 levels (shared with game-logic.js)
-        const CRT_PHOSPHORS = L ? L.CRT_PHOSPHORS : [
+        // Classic CRT phosphor palette — cycles every 8 levels
+        const CRT_PHOSPHORS = [
             { name: 'Green',      hex: '#00FF66', bg: '#000a04' },
             { name: 'Amber',      hex: '#FFB000', bg: '#0a0700' },
             { name: 'White',      hex: '#E8F0FF', bg: '#05060a' },
@@ -1464,7 +1457,6 @@
         }
 
         function phosphorForLevel(level) {
-            if (L) return L.phosphorForLevel(level);
             const n = CRT_PHOSPHORS.length;
             const i = ((Math.max(1, level | 0) - 1) % n + n) % n;
             return CRT_PHOSPHORS[i];
@@ -1543,20 +1535,17 @@
 
         // --- Seeded RNG (daily) / gameplay uses rnd(); SFX keep Math.random ---
         function mulberry32(seed) {
-            return L ? L.mulberry32(seed) : (function () {
-                let a = seed >>> 0;
-                return function () {
-                    a |= 0;
-                    a = (a + 0x6D2B79F5) | 0;
-                    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-                    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-                    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-                };
-            })();
+            let a = seed >>> 0;
+            return function () {
+                a |= 0;
+                a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
         }
 
         function hashString32(str) {
-            if (L) return L.hashString32(str);
             let h = 2166136261;
             const s = String(str);
             for (let i = 0; i < s.length; i++) {
@@ -1567,7 +1556,6 @@
         }
 
         function utcDayId() {
-            if (L) return L.utcDayId();
             const d = new Date();
             const y = d.getUTCFullYear();
             const m = String(d.getUTCMonth() + 1).padStart(2, '0');
@@ -1597,7 +1585,6 @@
 
         // --- localStorage leaderboards (per mode) ---
         function leaderboardKeyFor(meta) {
-            if (L) return L.leaderboardKeyFor(meta);
             meta = meta || {};
             if (meta.daily) return 'asteroidsLeaderboardDaily-' + (meta.dayId || utcDayId());
             if (meta.challenge === 'nohs') return 'asteroidsLB-ch-nohs';
@@ -1610,7 +1597,6 @@
             try {
                 const key = storageKey || 'asteroidsLeaderboard';
                 const data = JSON.parse(localStorage.getItem(key) || '[]');
-                if (L) return L.sanitizeLeaderboardRows(data);
                 if (!Array.isArray(data)) return [];
                 return data
                     .map(function (row) {
@@ -1639,7 +1625,6 @@
 
         function qualifiesForHighScore(score) {
             if (gameState.isAttract) return false;
-            if (L) return L.qualifiesForHighScore(score, gameState.leaderboard);
             if (score <= 0) return false;
             const board = gameState.leaderboard;
             if (board.length < 10) return true;
@@ -1672,7 +1657,6 @@
         let runStats = freshRunStats();
 
         function formatTime(sec) {
-            if (L) return L.formatTime(sec);
             const s = Math.max(0, Math.floor(sec));
             const m = Math.floor(s / 60);
             const r = s % 60;
@@ -1680,7 +1664,6 @@
         }
 
         function accuracyPct() {
-            if (L) return L.accuracyPct(runStats.shots, runStats.hits);
             if (runStats.shots <= 0) return 0;
             return Math.min(100, Math.round((runStats.hits / runStats.shots) * 100));
         }
@@ -2320,9 +2303,7 @@
         function registerComboKill() {
             combo.count++;
             combo.timer = COMBO_WINDOW;
-            combo.mult = L
-                ? L.comboMultiplier(combo.count)
-                : Math.min(COMBO_MAX_MULT, 1 + Math.floor(combo.count / 2));
+            combo.mult = Math.min(COMBO_MAX_MULT, 1 + Math.floor(combo.count / 2));
             if (combo.mult > combo.best) combo.best = combo.mult;
             if (combo.best > runStats.maxCombo) runStats.maxCombo = combo.best;
         }
@@ -2338,7 +2319,6 @@
         }
 
         function hardScale() {
-            if (L) return L.hardScale(!!gameState.hard);
             return gameState.hard ? 1.28 : 1;
         }
 
@@ -2346,7 +2326,7 @@
             let pts = points;
             if (withCombo) {
                 registerComboKill();
-                pts = L ? L.applyComboPoints(points, combo.mult) : Math.floor(points * combo.mult);
+                pts = Math.floor(points * combo.mult);
             }
             gameState.score += pts;
             if (x != null && y != null) spawnFloatScore(x, y, pts);
@@ -2359,7 +2339,6 @@
         }
 
         function asteroidPoints(size) {
-            if (L) return L.asteroidPoints(size);
             if (size > 30) return 20;
             if (size > 15) return 50;
             return 100;
@@ -2385,10 +2364,8 @@
             const hard = !!gameState.hard;
 
             // Boss on every Nth level (once per level)
-            const bossLevel = L
-                ? L.isBossLevel(gameState.level)
-                : (gameState.level >= BOSS_LEVEL_INTERVAL &&
-                    gameState.level % BOSS_LEVEL_INTERVAL === 0);
+            const bossLevel = gameState.level >= BOSS_LEVEL_INTERVAL &&
+                gameState.level % BOSS_LEVEL_INTERVAL === 0;
             if (bossLevel && !gameState.bossSpawnedThisLevel) {
                 gameState.bossSpawnedThisLevel = true;
                 alienShip = {
@@ -2446,14 +2423,10 @@
                 alienSpawnTimer = 0;
                 return;
             }
-            if (L) {
-                alienSpawnTimer = L.alienSpawnDelayFrames(minMs, maxMs, !!gameState.hard, rnd);
-            } else {
-                const scale = gameState.hard ? 0.72 : 1;
-                const minF = (minMs * scale / 1000) * TARGET_FPS;
-                const maxF = (maxMs * scale / 1000) * TARGET_FPS;
-                alienSpawnTimer = minF + rnd() * (maxF - minF);
-            }
+            const scale = gameState.hard ? 0.72 : 1;
+            const minF = (minMs * scale / 1000) * TARGET_FPS;
+            const maxF = (maxMs * scale / 1000) * TARGET_FPS;
+            alienSpawnTimer = minF + rnd() * (maxF - minF);
         }
 
         function tickAlienSpawn(f) {
@@ -2580,10 +2553,6 @@
         }
 
         function wrap(obj) {
-            if (L) {
-                L.wrap(obj, canvas.width, canvas.height);
-                return;
-            }
             const w = canvas.width;
             const h = canvas.height;
             obj.x = ((obj.x % w) + w) % w;
@@ -2591,7 +2560,6 @@
         }
 
         function checkCollision(obj1, obj2, radius1, radius2) {
-            if (L) return L.checkCollision(obj1, obj2, radius1, radius2);
             const dx = obj1.x - obj2.x;
             const dy = obj1.y - obj2.y;
             return Math.sqrt(dx * dx + dy * dy) < radius1 + radius2;
@@ -2844,9 +2812,7 @@
                 hard: hard,
                 daily: daily,
                 dayId: dayId,
-                dailySeed: daily
-                    ? (L ? L.dailySeedFromDayId(dayId) : hashString32('asteroids-daily-' + dayId))
-                    : 0,
+                dailySeed: daily ? hashString32('asteroids-daily-' + dayId) : 0,
                 challenge: challenge,
                 isAttract: isAttract,
                 cleared: false,

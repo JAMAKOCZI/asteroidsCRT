@@ -1,10 +1,9 @@
 /**
- * Pure Asteroids CRT helpers — shared by the browser game and Node tests.
- * No DOM, no Canvas. Safe to require/import in Node.
+ * Optional pure helpers for Node tests only.
+ * The playable game is fully self-contained in index.html (no require of this file).
+ * Keep algorithms here in sync when changing scoring/wrap/combo/seed logic in index.html.
  *
- * Browser: exposes global `AsteroidsLogic`.
- * Node/CommonJS: module.exports.
- * ESM: named exports via createRequire or dynamic import of CJS.
+ * Run tests (no npm): node --test test/game-logic.test.js
  */
 (function (root, factory) {
     var api = factory();
