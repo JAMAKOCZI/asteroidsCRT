@@ -36,16 +36,23 @@
             justify-content: center;
             position: relative;
             overflow: hidden;
+            /* Lit by CRT phosphor: cooler green spill + softer industrial base */
             background:
-                radial-gradient(ellipse 120% 50% at 50% -10%, rgba(0, 0, 0, 0.45), transparent 55%),
-                radial-gradient(ellipse 55% 28% at 50% 92%, rgba(180, 160, 100, 0.1), transparent 70%),
+                /* main CRT glow from screen center */
+                radial-gradient(ellipse 75% 60% at 50% 46%, rgba(40, 220, 80, 0.22) 0%, rgba(20, 90, 40, 0.1) 35%, transparent 68%),
+                /* secondary soft bloom */
+                radial-gradient(ellipse 95% 80% at 50% 50%, rgba(60, 140, 70, 0.12) 0%, transparent 70%),
+                /* ceiling still slightly darker, but milder */
+                radial-gradient(ellipse 120% 45% at 50% -8%, rgba(0, 0, 0, 0.28), transparent 55%),
+                /* floor catch-light from monitor */
+                radial-gradient(ellipse 60% 30% at 50% 88%, rgba(50, 160, 70, 0.14), transparent 70%),
                 linear-gradient(180deg,
-                    #5c5c58 0%,
-                    #6e6e6a 18%,
-                    #5a5a56 42%,
-                    #4e4e4b 62%,
-                    #3f3f3c 78%,
-                    #2e2e2c 100%
+                    #6a7068 0%,
+                    #7a8078 16%,
+                    #686e66 40%,
+                    #585e56 60%,
+                    #484e48 78%,
+                    #383e38 100%
                 );
         }
 
@@ -55,7 +62,7 @@
             position: absolute;
             inset: 0;
             pointer-events: none;
-            opacity: 0.45;
+            opacity: 0.28;
             background-image:
                 repeating-linear-gradient(
                     90deg,
@@ -82,10 +89,10 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 18%;
+            height: 16%;
             pointer-events: none;
             background:
-                linear-gradient(180deg, rgba(20, 20, 18, 0.75) 0%, rgba(40, 40, 38, 0.35) 55%, transparent 100%);
+                linear-gradient(180deg, rgba(20, 28, 22, 0.45) 0%, rgba(40, 50, 42, 0.18) 55%, transparent 100%);
             z-index: 1;
         }
 
@@ -108,10 +115,11 @@
             width: 48px;
             height: 28px;
             border-radius: 4px 4px 40% 40%;
-            background: linear-gradient(180deg, #333 0%, #222 100%);
+            background: linear-gradient(180deg, #3a3a36 0%, #282824 100%);
+            /* Lamps dimmer than CRT — room is dominated by green screen light */
             box-shadow:
-                0 0 40px 18px rgba(255, 220, 140, 0.08),
-                0 0 80px 40px rgba(255, 200, 100, 0.05);
+                0 0 30px 12px rgba(180, 200, 140, 0.06),
+                0 0 50px 24px rgba(40, 180, 70, 0.05);
             z-index: 2;
         }
         .lamp::after {
@@ -122,7 +130,7 @@
             bottom: -2px;
             height: 6px;
             border-radius: 50%;
-            background: rgba(255, 230, 160, 0.55);
+            background: rgba(200, 220, 160, 0.35);
             filter: blur(1px);
         }
         .lamp-a { left: 22%; }
@@ -135,9 +143,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            height: 22%;
+            height: 24%;
             z-index: 0;
-            background: linear-gradient(180deg, transparent 0%, rgba(30, 30, 28, 0.35) 100%);
+            background:
+                radial-gradient(ellipse 55% 40% at 50% 0%, rgba(40, 200, 80, 0.1), transparent 70%),
+                linear-gradient(180deg, transparent 0%, rgba(28, 36, 30, 0.4) 100%);
             pointer-events: none;
         }
 
@@ -386,7 +396,7 @@
                 inset 0 0 20px rgba(0, 0, 0, 0.9);
         }
 
-        /* Actual game screen host — keeps game visuals as-is */
+        /* Game screen — bright phosphor glow spills into the hangar */
         .crt-screen {
             position: relative;
             width: 800px;
@@ -395,21 +405,26 @@
             overflow: hidden;
             background: #000;
             box-shadow:
-                0 0 0 1px #050505,
-                inset 0 0 30px rgba(0, 40, 0, 0.25);
+                0 0 0 1px #0a1a0a,
+                0 0 28px 6px rgba(40, 255, 90, 0.35),
+                0 0 70px 18px rgba(20, 200, 60, 0.2),
+                0 0 120px 40px rgba(10, 120, 40, 0.12),
+                inset 0 0 20px rgba(0, 80, 20, 0.15);
         }
 
         canvas {
             display: block;
             width: 800px;
             height: 600px;
-            background: #000;
+            background: #000a00;
             image-rendering: pixelated;
             border: none;
             border-radius: 4px;
+            /* Slight brightness boost for vector art */
+            filter: brightness(1.12) contrast(1.08) saturate(1.15);
         }
 
-        /* Glass glare + scanlines over game only */
+        /* Light glass + soft scanlines — avoid darkening the game */
         .crt-overlay {
             position: absolute;
             inset: 0;
@@ -417,32 +432,30 @@
             border-radius: 4px;
             z-index: 5;
             background:
-                /* gentle glass reflection */
                 linear-gradient(
                     125deg,
-                    rgba(255, 255, 255, 0.07) 0%,
-                    transparent 32%,
-                    transparent 58%,
-                    rgba(255, 255, 255, 0.03) 100%
+                    rgba(255, 255, 255, 0.05) 0%,
+                    transparent 28%,
+                    transparent 62%,
+                    rgba(180, 255, 180, 0.03) 100%
                 ),
-                /* scanlines */
                 repeating-linear-gradient(
                     0deg,
                     transparent,
                     transparent 2px,
-                    rgba(0, 255, 0, 0.03) 2px,
-                    rgba(0, 255, 0, 0.03) 4px
+                    rgba(0, 255, 80, 0.025) 2px,
+                    rgba(0, 255, 80, 0.025) 4px
                 );
-            box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
+            box-shadow: inset 0 0 40px rgba(0, 40, 10, 0.12);
         }
 
-        /* Slight CRT curvature vignette */
         .crt-overlay::after {
             content: '';
             position: absolute;
             inset: 0;
             border-radius: 4px;
-            box-shadow: inset 0 0 80px 12px rgba(0, 0, 0, 0.35);
+            /* Very light edge falloff only */
+            box-shadow: inset 0 0 48px 4px rgba(0, 0, 0, 0.12);
             pointer-events: none;
         }
 
@@ -450,9 +463,12 @@
             position: absolute;
             top: 12px;
             left: 14px;
-            color: #00ff00;
+            color: #6dff6d;
             font-size: 16px;
-            text-shadow: 0 0 10px #00ff00;
+            font-weight: bold;
+            text-shadow:
+                0 0 6px #00ff66,
+                0 0 14px rgba(0, 255, 80, 0.85);
             z-index: 4;
             pointer-events: none;
         }
@@ -461,9 +477,10 @@
             position: absolute;
             bottom: 12px;
             left: 14px;
-            color: #00aa00;
+            color: #55cc55;
             font-size: 12px;
             line-height: 1.4;
+            text-shadow: 0 0 6px rgba(0, 255, 80, 0.5);
             z-index: 4;
             pointer-events: none;
         }
@@ -473,10 +490,12 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #00ff00;
+            color: #7fff7f;
             font-size: 24px;
             text-align: center;
-            text-shadow: 0 0 20px #00ff00;
+            text-shadow:
+                0 0 10px #00ff66,
+                0 0 24px rgba(0, 255, 80, 0.9);
             z-index: 10;
         }
 
@@ -1566,13 +1585,23 @@
             updateHud();
         }
 
+        // Bright phosphor palette (readable on CRT + hangar scene)
+        const PHOSPHOR = '#3dff3d';
+        const PHOSPHOR_DIM = '#2ecc2e';
+        const PHOSPHOR_SOFT = 'rgba(80, 255, 90,';
+        const BG_CRT = '#000f00';
+
         function render() {
-            ctx.fillStyle = '#000800';
+            ctx.fillStyle = BG_CRT;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = '#00ff00';
-            ctx.fillStyle = '#00ff00';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = PHOSPHOR;
+            ctx.fillStyle = PHOSPHOR;
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.shadowColor = 'rgba(40, 255, 80, 0.85)';
+            ctx.shadowBlur = 5;
 
             // Ship
             if (gameState.mode !== 'title' &&
@@ -1598,26 +1627,23 @@
                     ctx.stroke();
                 }
 
-                // Shield ring while invulnerable power / respawn
                 if (ship.invulnerable > 40) {
                     ctx.beginPath();
                     ctx.arc(0, 0, 16, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.45)';
+                    ctx.strokeStyle = 'rgba(100, 255, 120, 0.7)';
                     ctx.stroke();
-                    ctx.strokeStyle = '#00ff00';
+                    ctx.strokeStyle = PHOSPHOR;
                 }
 
                 ctx.restore();
             }
 
-            // Missiles
             missiles.forEach(missile => {
                 ctx.beginPath();
-                ctx.arc(missile.x, missile.y, 2, 0, Math.PI * 2);
+                ctx.arc(missile.x, missile.y, 2.5, 0, Math.PI * 2);
                 ctx.fill();
             });
 
-            // Alien
             if (alienShip) {
                 ctx.save();
                 ctx.translate(alienShip.x, alienShip.y);
@@ -1633,24 +1659,25 @@
                 ctx.stroke();
 
                 ctx.beginPath();
-                ctx.arc(-6, 0, 1, 0, Math.PI * 2);
-                ctx.arc(0, 0, 1, 0, Math.PI * 2);
-                ctx.arc(6, 0, 1, 0, Math.PI * 2);
+                ctx.arc(-6, 0, 1.5, 0, Math.PI * 2);
+                ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+                ctx.arc(6, 0, 1.5, 0, Math.PI * 2);
                 ctx.fill();
 
                 ctx.restore();
             }
 
-            // Alien missiles
+            ctx.shadowColor = 'rgba(255, 80, 60, 0.9)';
             alienMissiles.forEach(missile => {
-                ctx.fillStyle = '#ff4444';
+                ctx.fillStyle = '#ff6655';
                 ctx.beginPath();
-                ctx.arc(missile.x, missile.y, 3, 0, Math.PI * 2);
+                ctx.arc(missile.x, missile.y, 3.5, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = '#00ff00';
             });
+            ctx.shadowColor = 'rgba(40, 255, 80, 0.85)';
+            ctx.fillStyle = PHOSPHOR;
+            ctx.strokeStyle = PHOSPHOR;
 
-            // Asteroids
             asteroids.forEach(asteroid => {
                 ctx.save();
                 ctx.translate(asteroid.x, asteroid.y);
@@ -1672,48 +1699,46 @@
                 ctx.restore();
             });
 
-            // Power-ups
             powerups.forEach(p => {
                 const blink = Math.floor(performance.now() / 120) % 2;
                 if (!blink && p.life < 90) return;
                 ctx.save();
                 ctx.translate(p.x, p.y);
-                ctx.strokeStyle = '#00ff88';
+                ctx.strokeStyle = '#66ffbb';
+                ctx.fillStyle = '#66ffbb';
+                ctx.shadowColor = 'rgba(80, 255, 180, 0.9)';
                 ctx.beginPath();
                 ctx.arc(0, 0, p.size, 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.fillStyle = '#00ff88';
-                ctx.font = '10px "Courier New", monospace';
+                ctx.font = 'bold 11px "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const label = p.type === 'shield' ? 'S' : (p.type === 'rapid' ? 'R' : 'T');
                 ctx.fillText(label, 0, 1);
                 ctx.restore();
-                ctx.strokeStyle = '#00ff00';
-                ctx.fillStyle = '#00ff00';
+                ctx.strokeStyle = PHOSPHOR;
+                ctx.fillStyle = PHOSPHOR;
+                ctx.shadowColor = 'rgba(40, 255, 80, 0.85)';
             });
 
-            // Particles
             particles.forEach(particle => {
-                const alpha = particle.life / particle.maxLife;
-                ctx.fillStyle = 'rgba(0, 255, 0, ' + alpha + ')';
-                ctx.fillRect(particle.x, particle.y, 2, 2);
+                const alpha = Math.min(1, (particle.life / particle.maxLife) * 1.25);
+                ctx.fillStyle = PHOSPHOR_SOFT + alpha + ')';
+                ctx.fillRect(particle.x, particle.y, 2.5, 2.5);
             });
 
-            // Floating scores
             floatScores.forEach(fs => {
-                const alpha = fs.life / fs.maxLife;
-                ctx.fillStyle = 'rgba(0, 255, 0, ' + alpha + ')';
-                ctx.font = '12px "Courier New", monospace';
+                const alpha = Math.min(1, (fs.life / fs.maxLife) * 1.2);
+                ctx.fillStyle = PHOSPHOR_SOFT + alpha + ')';
+                ctx.font = 'bold 13px "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText('+' + fs.pts, fs.x, fs.y);
             });
             ctx.textAlign = 'left';
 
-            // HUD extras on canvas
             if (gameState.mode === 'playing' || gameState.mode === 'paused') {
-                ctx.font = '12px "Courier New", monospace';
-                ctx.fillStyle = '#00aa00';
+                ctx.font = 'bold 12px "Courier New", monospace';
+                ctx.fillStyle = PHOSPHOR_DIM;
                 let hudY = 20;
                 if (ship.hyperspaceCooldown > 0) {
                     ctx.fillText('HS COOLDOWN', canvas.width - 120, hudY);
@@ -1728,36 +1753,36 @@
                 }
             }
 
-            // Center message
             if (gameState.message && gameState.messageTimer > 0 && gameState.mode === 'playing') {
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = PHOSPHOR;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 28px "Courier New", monospace';
-                ctx.shadowColor = '#00ff00';
-                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(60, 255, 100, 1)';
+                ctx.shadowBlur = 14;
                 ctx.fillText(gameState.message, canvas.width / 2, canvas.height / 2 - 80);
-                ctx.shadowBlur = 0;
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = 'rgba(40, 255, 80, 0.85)';
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'alphabetic';
             }
 
-            // Title
             if (gameState.mode === 'title') {
-                ctx.fillStyle = 'rgba(0, 8, 0, 0.55)';
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(0, 12, 0, 0.4)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = PHOSPHOR;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 48px "Courier New", monospace';
-                ctx.shadowColor = '#00ff00';
-                ctx.shadowBlur = 16;
+                ctx.shadowColor = 'rgba(60, 255, 100, 1)';
+                ctx.shadowBlur = 18;
                 ctx.fillText('ASTEROIDS', canvas.width / 2, canvas.height / 2 - 40);
                 ctx.font = '20px "Courier New", monospace';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 10;
                 ctx.fillText('CRT EDITION', canvas.width / 2, canvas.height / 2 + 10);
                 ctx.font = '16px "Courier New", monospace';
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = 8;
                 if (Math.floor(performance.now() / 500) % 2) {
                     ctx.fillText('PRESS ANY KEY', canvas.width / 2, canvas.height / 2 + 60);
                 }
@@ -1766,24 +1791,27 @@
                 ctx.textBaseline = 'alphabetic';
             }
 
-            // Pause
             if (gameState.mode === 'paused') {
-                ctx.fillStyle = 'rgba(0, 8, 0, 0.45)';
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(0, 12, 0, 0.35)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff00';
+                ctx.fillStyle = PHOSPHOR;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.font = 'bold 36px "Courier New", monospace';
-                ctx.shadowColor = '#00ff00';
-                ctx.shadowBlur = 12;
+                ctx.shadowColor = 'rgba(60, 255, 100, 1)';
+                ctx.shadowBlur = 14;
                 ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
                 ctx.font = '14px "Courier New", monospace';
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = 8;
                 ctx.fillText('Press P to resume', canvas.width / 2, canvas.height / 2 + 36);
                 ctx.shadowBlur = 0;
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'alphabetic';
             }
+
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
         }
 
         function gameLoop(timestamp) {
