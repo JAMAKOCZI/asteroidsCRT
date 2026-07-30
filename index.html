@@ -111,17 +111,19 @@
             z-index: 1;
         }
 
+        /* Single full-width ceiling beam that carries the lamps */
         .hangar-ceiling .beam {
             position: absolute;
-            left: 4%;
-            right: 4%;
+            left: 0;
+            right: 0;
+            top: 10%;
             height: 18px;
             background:
                 linear-gradient(180deg, #4a4c48 0%, #2e302c 35%, #1a1c18 100%);
             box-shadow:
                 0 8px 16px rgba(0, 0, 0, 0.5),
                 inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            border-radius: 1px;
+            border-radius: 0;
         }
 
         /* I-beam flanges */
@@ -137,10 +139,6 @@
         }
         .hangar-ceiling .beam::before { top: -4px; }
         .hangar-ceiling .beam::after { bottom: -4px; }
-
-        .hangar-ceiling .beam:nth-child(1) { top: 10%; }
-        .hangar-ceiling .beam:nth-child(2) { top: 38%; opacity: 0.92; }
-        .hangar-ceiling .beam:nth-child(3) { top: 62%; opacity: 0.75; height: 14px; }
 
         /* Wall conduit / pipes */
         .hangar-pipe {
@@ -1119,8 +1117,6 @@
 <body>
     <div class="hangar">
         <div class="hangar-ceiling" aria-hidden="true">
-            <div class="beam"></div>
-            <div class="beam"></div>
             <div class="beam"></div>
         </div>
         <div class="hangar-pipe hangar-pipe-v" aria-hidden="true"></div>
