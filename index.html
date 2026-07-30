@@ -2593,11 +2593,11 @@
             }
             createParticles(asteroid.x, asteroid.y, 6);
 
-            // Drops: large often, medium sometimes (size 40 → large, 20 → medium)
-            if (gameState.challenge !== 'nopu' && !gameState.isAttract) {
+            // Drops: 14% large, 4% medium — never in attract / no-power challenge
+            if (gameState.challenge !== 'nopu' && !gameState.isAttract && gameState.mode === 'playing') {
                 let dropChance = 0;
-                if (asteroid.size > 30) dropChance = 0.32;
-                else if (asteroid.size > 15) dropChance = 0.18;
+                if (asteroid.size > 30) dropChance = 0.14;
+                else if (asteroid.size > 15) dropChance = 0.04;
                 if (dropChance > 0 && rnd() < dropChance) {
                     spawnPowerup(asteroid.x, asteroid.y);
                 }
@@ -2606,7 +2606,8 @@
         }
 
         function spawnPowerup(x, y) {
-            if (gameState.challenge === 'nopu' || gameState.isAttract) return;
+            // Idle/attract and challenge lock — hard block
+            if (gameState.challenge === 'nopu' || gameState.isAttract || gameState.mode === 'attract') return;
             const types = ['shield', 'rapid', 'triple', 'wide', 'slow'];
             // Nudge away from ship so a kill under the nose does not auto-collect instantly
             let dx = x - ship.x;
@@ -2898,6 +2899,7 @@
             runStats = freshRunStats();
             recordingTrail = [];
             clearWorld();
+            powerups = []; // never show power-ups in idle demo
             setRngSeed(null);
             applyCrtTheme(1);
             resetShip();
@@ -3451,26 +3453,39 @@
             ctx.fillStyle = ink;
             ctx.lineWidth = 2;
 
-            // Ghost trail from last real run
+            // Ghost trail from last real run (dots only; break on wrap so we never draw
+            // long chords across the screen when the ship teleported edges)
             if ((gameState.mode === 'playing' || gameState.mode === 'paused') &&
                 ghostTrail && ghostTrail.length > 1) {
                 ctx.save();
-                ctx.strokeStyle = crtRgba(0.18);
+                ctx.fillStyle = crtRgba(0.12);
+                ctx.strokeStyle = crtRgba(0.2);
                 ctx.lineWidth = 1;
-                ctx.beginPath();
-                for (let gi = 0; gi < ghostTrail.length; gi++) {
+                const wrapJumpX = canvas.width * 0.45;
+                const wrapJumpY = canvas.height * 0.45;
+                for (let gi = 0; gi < ghostTrail.length; gi += 2) {
                     const gp = ghostTrail[gi];
-                    if (gi === 0) ctx.moveTo(gp.x, gp.y);
-                    else ctx.lineTo(gp.x, gp.y);
+                    if (gi > 0) {
+                        const prev = ghostTrail[gi - 1];
+                        if (Math.abs(gp.x - prev.x) > wrapJumpX || Math.abs(gp.y - prev.y) > wrapJumpY) {
+                            continue;
+                        }
+                    }
+                    ctx.fillRect(gp.x - 0.5, gp.y - 0.5, 1.5, 1.5);
                 }
-                ctx.stroke();
+                // Faint ghost ship at end of trail
                 const last = ghostTrail[ghostTrail.length - 1];
-                ctx.globalAlpha = 0.25;
+                ctx.translate(last.x, last.y);
+                ctx.rotate(last.a || 0);
+                ctx.globalAlpha = 0.22;
                 ctx.beginPath();
-                ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+                ctx.moveTo(10, 0);
+                ctx.lineTo(-7, -5);
+                ctx.lineTo(-4, 0);
+                ctx.lineTo(-7, 5);
+                ctx.closePath();
                 ctx.stroke();
                 ctx.restore();
-                ctx.globalAlpha = 1;
             }
 
             // Ship
