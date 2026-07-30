@@ -914,14 +914,35 @@
         .ui {
             position: absolute;
             top: 12px;
-            left: 14px;
             color: var(--crt-hex);
             font-size: 16px;
             text-shadow: 0 0 10px var(--crt-hex);
             z-index: 4;
             pointer-events: none;
+            line-height: 1.35;
         }
 
+        .ui-left {
+            left: 14px;
+            text-align: left;
+        }
+
+        .ui-right {
+            right: 14px;
+            left: auto;
+            text-align: right;
+        }
+
+        .ui-right .ui-phosphor {
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            color: var(--crt-dim);
+            text-shadow: 0 0 6px var(--crt-dim);
+            margin-top: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Controls only on title / pause — hidden during play so they don't cover the field */
         .controls {
             position: absolute;
             bottom: 12px;
@@ -931,6 +952,11 @@
             line-height: 1.4;
             z-index: 4;
             pointer-events: none;
+            display: none;
+        }
+
+        .controls.is-visible {
+            display: block;
         }
 
         .game-over {
@@ -1169,12 +1195,15 @@
                                     role="img"
                                     aria-label="Asteroids game. A/D or arrows turn, W or Up boost, Space fire, H or Down hyperspace, P pause."></canvas>
                                 <div class="crt-overlay" aria-hidden="true"></div>
-                                <div class="ui" aria-live="polite" aria-atomic="true">
+                                <div class="ui ui-left" aria-live="polite" aria-atomic="true">
                                     <div>SHIPS: <span id="lives">3</span></div>
                                     <div>SCORE: <span id="score">0</span></div>
-                                    <div>LEVEL: <span id="level">1</span></div>
                                 </div>
-                                <div class="controls" aria-hidden="true">
+                                <div class="ui ui-right" aria-live="polite">
+                                    <div>LEVEL: <span id="level">1</span></div>
+                                    <div class="ui-phosphor" id="phosphorLabel">Green</div>
+                                </div>
+                                <div class="controls is-visible" id="controlsHelp" aria-hidden="true">
                                     LEFT/RIGHT or A/D: Turn<br>
                                     UP / W: Boost<br>
                                     SPACE: Fire<br>
@@ -1239,6 +1268,8 @@
         const livesElement = document.getElementById('lives');
         const scoreElement = document.getElementById('score');
         const levelElement = document.getElementById('level');
+        const phosphorLabel = document.getElementById('phosphorLabel');
+        const controlsHelp = document.getElementById('controlsHelp');
         const gameOverElement = document.getElementById('gameOver');
         const gameOverText = document.getElementById('gameOverText');
         const initialsPrompt = document.getElementById('initialsPrompt');
@@ -1312,6 +1343,9 @@
                 host.style.setProperty('--crt-g', String(rgb.g));
                 host.style.setProperty('--crt-b', String(rgb.b));
                 host.style.setProperty('--crt-dim', dim);
+            }
+            if (phosphorLabel) {
+                phosphorLabel.textContent = p.name;
             }
         }
 
@@ -1487,6 +1521,7 @@
 
             if (e.code === 'KeyP' && (gameState.mode === 'playing' || gameState.mode === 'paused')) {
                 gameState.mode = gameState.mode === 'playing' ? 'paused' : 'playing';
+                updateControlsHelp();
                 return;
             }
 
@@ -1868,8 +1903,7 @@
             gameState.level++;
             gameState.lives++;
             applyCrtTheme(gameState.level);
-            const ph = phosphorForLevel(gameState.level);
-            showMessage('LEVEL ' + gameState.level + ' · ' + ph.name.toUpperCase(), 100);
+            showMessage(phosphorForLevel(gameState.level).name.toUpperCase(), 90);
             alienShip = null;
             alienMissiles = [];
             powerups = [];
@@ -1883,6 +1917,7 @@
             gameState.gameOver = true;
             gameState.mode = 'gameover';
             gameOverElement.style.display = 'block';
+            updateControlsHelp();
 
             if (qualifiesForHighScore(gameState.score)) {
                 gameState.enteringInitials = true;
@@ -1953,10 +1988,19 @@
             scheduleAlienSpawn(8000, 14000);
         }
 
+        function updateControlsHelp() {
+            if (!controlsHelp) return;
+            // Help text only before play or while paused — not during active play
+            const show = gameState.mode === 'title' || gameState.mode === 'paused';
+            controlsHelp.classList.toggle('is-visible', show);
+            controlsHelp.setAttribute('aria-hidden', show ? 'false' : 'true');
+        }
+
         function updateHud() {
             livesElement.textContent = gameState.lives;
             scoreElement.textContent = gameState.score;
             levelElement.textContent = gameState.level;
+            updateControlsHelp();
         }
 
         function handleInitialsInput(e) {
@@ -2428,22 +2472,24 @@
             });
             ctx.textAlign = 'left';
 
-            // HUD extras on canvas
+            // HUD extras on canvas (below LEVEL in the top-right DOM)
             if (gameState.mode === 'playing' || gameState.mode === 'paused') {
                 ctx.font = '12px "Courier New", monospace';
                 ctx.fillStyle = crtTheme.dim;
-                let hudY = 20;
+                ctx.textAlign = 'right';
+                let hudY = 56;
                 if (ship.hyperspaceCooldown > 0) {
-                    ctx.fillText('HS COOLDOWN', canvas.width - 120, hudY);
+                    ctx.fillText('HS COOLDOWN', canvas.width - 14, hudY);
                     hudY += 16;
                 }
                 if (ship.rapidFire > 0) {
-                    ctx.fillText('RAPID', canvas.width - 120, hudY);
+                    ctx.fillText('RAPID', canvas.width - 14, hudY);
                     hudY += 16;
                 }
                 if (ship.tripleShot > 0) {
-                    ctx.fillText('TRIPLE', canvas.width - 120, hudY);
+                    ctx.fillText('TRIPLE', canvas.width - 14, hudY);
                 }
+                ctx.textAlign = 'left';
             }
 
             // Center message
