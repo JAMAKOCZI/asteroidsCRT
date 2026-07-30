@@ -94,8 +94,9 @@
         </div>
         <div class="controls">
             LEFT/RIGHT: Turn<br>
-            TAB: Boost<br>
-            SPACE: Fire
+            UP / W: Boost<br>
+            SPACE: Fire<br>
+            P: Pause
         </div>
         <div id="gameOver" class="game-over" style="display: none;">
             <div id="gameOverText">GAME OVER</div>
@@ -163,12 +164,19 @@
         };
 
         const MAX_SHIP_SPEED = 8;
+        // Physics tuned for 60 FPS; multiply rates by (dt * 60)
+        const TARGET_FPS = 60;
+        let lastFrameTime = 0;
 
         // Input handling
         const keys = {};
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            if (e.code === 'Tab') e.preventDefault();
+            // Prevent page scroll / focus steal for game keys
+            if (e.code === 'Tab' || e.code === 'Space' || e.code === 'ArrowUp' ||
+                e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+                e.preventDefault();
+            }
             
             if (gameState.enteringInitials) {
                 handleInitialsInput(e);
@@ -179,6 +187,34 @@
         document.addEventListener('keyup', (e) => {
             keys[e.code] = false;
         });
+
+        function isBoosting() {
+            return !!(keys['ArrowUp'] || keys['KeyW'] || keys['Tab']);
+        }
+
+        // Random irregular outline for each asteroid (cached radii)
+        function makeAsteroidVertices(size) {
+            const points = 8 + Math.floor(Math.random() * 5); // 8–12
+            const radii = [];
+            for (let i = 0; i < points; i++) {
+                radii.push(size * (0.7 + Math.random() * 0.4));
+            }
+            return radii;
+        }
+
+        function makeAsteroid(x, y, size, speedMultiplier, speedScale) {
+            const scale = speedScale || 2;
+            return {
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * scale * speedMultiplier,
+                vy: (Math.random() - 0.5) * scale * speedMultiplier,
+                size: size,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.1 * speedMultiplier * (scale > 2 ? 2 : 1),
+                vertices: makeAsteroidVertices(size)
+            };
+        }
 
         // Ship object
         const ship = {
@@ -225,9 +261,10 @@
             }
         }
 
-        // Update alien ship
-        function updateAlienShip() {
+        // Update alien ship (f = frame scale from dt)
+        function updateAlienShip(f) {
             if (!alienShip) return;
+            f = f == null ? 1 : f;
             
             // AI: Chase player but with some randomness
             const dx = ship.x - alienShip.x;
@@ -244,17 +281,17 @@
                 alienShip.vy = Math.sin(angle) * 2;
                 alienShip.changeDirection = 60 + Math.random() * 60;
             } else {
-                alienShip.changeDirection--;
+                alienShip.changeDirection -= f;
             }
             
             // Move alien ship
-            alienShip.x += alienShip.vx;
-            alienShip.y += alienShip.vy;
+            alienShip.x += alienShip.vx * f;
+            alienShip.y += alienShip.vy * f;
             wrap(alienShip);
             
             // Shoot at player
-            alienShip.lastShot++;
-            if (alienShip.lastShot > 90 && distance < 300) { // Shoot every 1.5 seconds when close
+            alienShip.lastShot += f;
+            if (alienShip.lastShot > 90 && distance < 300) { // ~1.5s when close
                 const shootAngle = Math.atan2(dy, dx);
                 alienMissiles.push({
                     x: alienShip.x,
@@ -279,15 +316,7 @@
                     y = Math.random() * canvas.height;
                 } while (Math.sqrt((x - ship.x) ** 2 + (y - ship.y) ** 2) < 100);
                 
-                asteroids.push({
-                    x: x,
-                    y: y,
-                    vx: (Math.random() - 0.5) * 2 * speedMultiplier,
-                    vy: (Math.random() - 0.5) * 2 * speedMultiplier,
-                    size: 40,
-                    rotation: 0,
-                    rotationSpeed: (Math.random() - 0.5) * 0.1 * speedMultiplier
-                });
+                asteroids.push(makeAsteroid(x, y, 40, speedMultiplier, 2));
             }
         }
 
@@ -340,15 +369,15 @@
                 const speedMultiplier = Math.pow(1.1, gameState.level - 1);
                 
                 for (let i = 0; i < 2; i++) {
-                    pieces.push({
-                        x: asteroid.x + (Math.random() - 0.5) * 20,
-                        y: asteroid.y + (Math.random() - 0.5) * 20,
-                        vx: (Math.random() - 0.5) * 3 * speedMultiplier,
-                        vy: (Math.random() - 0.5) * 3 * speedMultiplier,
-                        size: newSize,
-                        rotation: Math.random() * Math.PI * 2,
-                        rotationSpeed: (Math.random() - 0.5) * 0.2 * speedMultiplier
-                    });
+                    const piece = makeAsteroid(
+                        asteroid.x + (Math.random() - 0.5) * 20,
+                        asteroid.y + (Math.random() - 0.5) * 20,
+                        newSize,
+                        speedMultiplier,
+                        3
+                    );
+                    piece.rotationSpeed = (Math.random() - 0.5) * 0.2 * speedMultiplier;
+                    pieces.push(piece);
                 }
             }
             createParticles(asteroid.x, asteroid.y, 6);
@@ -444,26 +473,27 @@
             ship.invulnerable = 120; // 2 seconds of invulnerability
         }
 
-        // Game update loop
-        function update() {
+        // Game update loop (dt in seconds; f scales 60 FPS-tuned values)
+        function update(dt) {
             if (gameState.gameOver) return;
+            const f = dt * TARGET_FPS;
 
             // Handle input
             if (keys['ArrowLeft']) {
-                ship.angle -= 0.15;
+                ship.angle -= 0.15 * f;
             }
             if (keys['ArrowRight']) {
-                ship.angle += 0.15;
+                ship.angle += 0.15 * f;
             }
-            if (keys['Tab']) {
+            if (isBoosting()) {
                 ship.boosting = true;
-                ship.vx += Math.cos(ship.angle) * 0.3;
-                ship.vy += Math.sin(ship.angle) * 0.3;
+                ship.vx += Math.cos(ship.angle) * 0.3 * f;
+                ship.vy += Math.sin(ship.angle) * 0.3 * f;
                 
                 // Add thruster particles
                 const thrusterX = ship.x - Math.cos(ship.angle) * 15;
                 const thrusterY = ship.y - Math.sin(ship.angle) * 15;
-                if (Math.random() < 0.5) {
+                if (Math.random() < 0.5 * Math.min(f, 1.5)) {
                     particles.push({
                         x: thrusterX + (Math.random() - 0.5) * 4,
                         y: thrusterY + (Math.random() - 0.5) * 4,
@@ -490,10 +520,10 @@
             }
 
             // Update ship
-            ship.x += ship.vx;
-            ship.y += ship.vy;
-            ship.vx *= 0.99; // Friction
-            ship.vy *= 0.99;
+            ship.x += ship.vx * f;
+            ship.y += ship.vy * f;
+            ship.vx *= Math.pow(0.99, f);
+            ship.vy *= Math.pow(0.99, f);
 
             // Clamp ship speed so continuous boost cannot run away
             const shipSpeed = Math.hypot(ship.vx, ship.vy);
@@ -505,43 +535,44 @@
             wrap(ship);
             
             if (ship.invulnerable > 0) {
-                ship.invulnerable--;
+                ship.invulnerable -= f;
+                if (ship.invulnerable < 0) ship.invulnerable = 0;
             }
 
             // Update missiles
             missiles = missiles.filter(missile => {
-                missile.x += missile.vx;
-                missile.y += missile.vy;
+                missile.x += missile.vx * f;
+                missile.y += missile.vy * f;
                 wrap(missile);
-                missile.life--;
+                missile.life -= f;
                 return missile.life > 0;
             });
 
             // Update alien ship
-            updateAlienShip();
+            updateAlienShip(f);
 
             // Update alien missiles
             alienMissiles = alienMissiles.filter(missile => {
-                missile.x += missile.vx;
-                missile.y += missile.vy;
+                missile.x += missile.vx * f;
+                missile.y += missile.vy * f;
                 wrap(missile);
-                missile.life--;
+                missile.life -= f;
                 return missile.life > 0;
             });
 
             // Update asteroids
             asteroids.forEach(asteroid => {
-                asteroid.x += asteroid.vx;
-                asteroid.y += asteroid.vy;
-                asteroid.rotation += asteroid.rotationSpeed;
+                asteroid.x += asteroid.vx * f;
+                asteroid.y += asteroid.vy * f;
+                asteroid.rotation += asteroid.rotationSpeed * f;
                 wrap(asteroid);
             });
 
             // Update particles
             particles = particles.filter(particle => {
-                particle.x += particle.vx;
-                particle.y += particle.vy;
-                particle.life--;
+                particle.x += particle.vx * f;
+                particle.y += particle.vy * f;
+                particle.life -= f;
                 return particle.life > 0;
             });
 
@@ -722,17 +753,18 @@
                 ctx.fillStyle = '#00ff00';
             });
 
-            // Draw asteroids
+            // Draw asteroids (unique vertex radii per rock)
             asteroids.forEach(asteroid => {
                 ctx.save();
                 ctx.translate(asteroid.x, asteroid.y);
                 ctx.rotate(asteroid.rotation);
                 
-                const points = 8;
+                const radii = asteroid.vertices || [asteroid.size];
+                const points = radii.length;
                 ctx.beginPath();
                 for (let i = 0; i < points; i++) {
                     const angle = (i / points) * Math.PI * 2;
-                    const radius = asteroid.size * (0.8 + Math.sin(i * 2.3) * 0.2);
+                    const radius = radii[i];
                     const x = Math.cos(angle) * radius;
                     const y = Math.sin(angle) * radius;
                     
@@ -756,9 +788,15 @@
             });
         }
 
-        // Game loop
-        function gameLoop() {
-            update();
+        // Game loop with delta time (capped after tab blur)
+        function gameLoop(timestamp) {
+            if (!lastFrameTime) lastFrameTime = timestamp;
+            let dt = (timestamp - lastFrameTime) / 1000;
+            lastFrameTime = timestamp;
+            if (dt > 0.05) dt = 0.05; // max ~20 FPS equivalent step
+            if (dt < 0) dt = 0;
+
+            update(dt);
             render();
             requestAnimationFrame(gameLoop);
         }
