@@ -1403,7 +1403,11 @@
         const TARGET_FPS = 60;
         const EXTRA_LIFE_EVERY = 10000;
         const MAX_MISSILES = 4;
-        const MAX_MISSILES_RAPID = 7;
+        // Concurrent missile caps (must fit at least one full volley)
+        const MAX_MISSILES_RAPID = 16;
+        const MAX_MISSILES_TRIPLE = 12; // 4 full triple volleys
+        const MAX_MISSILES_WIDE = 15;   // 3 full wide volleys
+        const RAPID_FIRE_INTERVAL = 3.2; // frames between continuous shots (~18/s)
         const HYPERSPACE_COOLDOWN = 180;
         const HYPERSPACE_SAFE_COOLDOWN = 320;
         const HYPERSPACE_HOLD_FRAMES = 28;
@@ -2046,7 +2050,6 @@
                 keys[k] = false;
             }
             keys.spacePressed = false;
-            keys.rapidAcc = 0;
         }
 
         function isModifierOnlyOrBrowserChord(e) {
@@ -2253,6 +2256,7 @@
             tripleShot: 0,
             wideShot: 0,
             slowField: 0,
+            fireCooldown: 0,
             hsCharge: 0,
             hsConsumed: false
         };
@@ -2652,39 +2656,47 @@
             }
         }
 
-        function firePlayerMissiles() {
-            const maxM = ship.rapidFire > 0 ? MAX_MISSILES_RAPID : MAX_MISSILES;
-            if (missiles.length >= maxM) return;
-
-            let angles;
+        function getPlayerFireAngles() {
+            // Wide supersedes triple when both are active
             if (ship.wideShot > 0) {
-                angles = [
+                return [
                     ship.angle - 0.42,
                     ship.angle - 0.21,
                     ship.angle,
                     ship.angle + 0.21,
                     ship.angle + 0.42
                 ];
-            } else if (ship.tripleShot > 0) {
-                angles = [ship.angle - 0.22, ship.angle, ship.angle + 0.22];
-            } else {
-                angles = [ship.angle];
             }
+            if (ship.tripleShot > 0) {
+                return [ship.angle - 0.22, ship.angle, ship.angle + 0.22];
+            }
+            return [ship.angle];
+        }
 
-            let fired = 0;
+        function missileCapForLoadout() {
+            if (ship.wideShot > 0) return MAX_MISSILES_WIDE;
+            if (ship.tripleShot > 0) return MAX_MISSILES_TRIPLE;
+            if (ship.rapidFire > 0) return MAX_MISSILES_RAPID;
+            return MAX_MISSILES;
+        }
+
+        // Always fires a complete volley (never 1/3 of a triple). Returns true if fired.
+        function firePlayerMissiles() {
+            const angles = getPlayerFireAngles();
+            const cap = missileCapForLoadout();
+            // Need room for the whole volley — partial salvos looked like "double/single" triple
+            if (missiles.length + angles.length > cap) return false;
+
             for (let i = 0; i < angles.length; i++) {
-                if (missiles.length >= maxM) break;
                 missiles.push(createMissile(
                     ship.x + Math.cos(angles[i]) * 12,
                     ship.y + Math.sin(angles[i]) * 12,
                     angles[i]
                 ));
-                fired++;
             }
-            if (fired > 0) {
-                if (isRealPlay()) runStats.shots += fired;
-                sfxShoot();
-            }
+            if (isRealPlay()) runStats.shots += angles.length;
+            sfxShoot();
+            return true;
         }
 
         function findSafeHyperspaceSpot() {
@@ -2745,6 +2757,7 @@
             ship.tripleShot = 0;
             ship.wideShot = 0;
             ship.slowField = 0;
+            ship.fireCooldown = 0;
             ship.hsCharge = 0;
             ship.hsConsumed = false;
             resetCombo();
@@ -3000,8 +3013,13 @@
                     ship.boosting = false;
                 }
                 if (attractFireCd <= 0 && Math.abs(diff) < 0.35) {
-                    firePlayerMissiles();
-                    attractFireCd = 14 + Math.random() * 10;
+                    if (firePlayerMissiles()) {
+                        attractFireCd = ship.rapidFire > 0
+                            ? RAPID_FIRE_INTERVAL
+                            : (12 + Math.random() * 10);
+                    } else {
+                        attractFireCd = 2;
+                    }
                 }
             } else {
                 ship.boosting = false;
@@ -3091,7 +3109,8 @@
             ship.invulnerable = 120;
             ship.hyperspaceCooldown = 0;
             ship.boosting = false;
-            // Keep power-ups across respawn only if still timed — clear on death already
+            ship.fireCooldown = 0;
+            // Timed power-ups cleared on death in killShip; kept across level change
         }
 
         function updateTitleAmbient(dt) {
@@ -3179,6 +3198,10 @@
                 ship.slowField -= f;
                 if (ship.slowField < 0) ship.slowField = 0;
             }
+            if (ship.fireCooldown > 0) {
+                ship.fireCooldown -= f;
+                if (ship.fireCooldown < 0) ship.fireCooldown = 0;
+            }
 
             // Input: player or attract AI
             if (gameState.mode === 'attract') {
@@ -3231,21 +3254,28 @@
                     ship.boosting = false;
                 }
 
+                // Fire: normal = one volley per press; rapid = continuous stream while held
                 if (keys['Space']) {
-                    if (!keys.spacePressed) {
-                        firePlayerMissiles();
-                        keys.spacePressed = true;
-                    } else if (ship.rapidFire > 0) {
-                        if (!keys.rapidAcc) keys.rapidAcc = 0;
-                        keys.rapidAcc += f;
-                        if (keys.rapidAcc >= 6) {
-                            keys.rapidAcc = 0;
-                            firePlayerMissiles();
+                    if (ship.rapidFire > 0) {
+                        // Continuous stream — no burst/pause from edge-trigger or long gaps
+                        if (ship.fireCooldown <= 0) {
+                            if (firePlayerMissiles()) {
+                                ship.fireCooldown = RAPID_FIRE_INTERVAL;
+                            } else {
+                                // Cap full — retry soon once a missile expires
+                                ship.fireCooldown = 1;
+                            }
                         }
+                        keys.spacePressed = true;
+                    } else if (!keys.spacePressed) {
+                        if (ship.fireCooldown <= 0) {
+                            firePlayerMissiles();
+                            ship.fireCooldown = 8; // light anti-mash gap for single shots
+                        }
+                        keys.spacePressed = true;
                     }
                 } else {
                     keys.spacePressed = false;
-                    keys.rapidAcc = 0;
                 }
             }
 
