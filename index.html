@@ -32,18 +32,13 @@
             min-height: 100vh;
             width: 100%;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
             position: relative;
             overflow: hidden;
             background:
-                /* ceiling shadow */
-                radial-gradient(ellipse 120% 50% at 50% -10%, rgba(0, 0, 0, 0.55), transparent 55%),
-                /* floor light pool under table */
-                radial-gradient(ellipse 55% 28% at 50% 88%, rgba(180, 160, 100, 0.12), transparent 70%),
-                /* wall vignette */
-                radial-gradient(ellipse 90% 80% at 50% 45%, rgba(90, 90, 86, 0.35), transparent 70%),
-                /* concrete base */
+                radial-gradient(ellipse 120% 50% at 50% -10%, rgba(0, 0, 0, 0.45), transparent 55%),
+                radial-gradient(ellipse 55% 28% at 50% 92%, rgba(180, 160, 100, 0.1), transparent 70%),
                 linear-gradient(180deg,
                     #5c5c58 0%,
                     #6e6e6a 18%,
@@ -134,101 +129,79 @@
         .lamp-b { left: 50%; transform: translateX(-50%); }
         .lamp-c { right: 22%; left: auto; }
 
-        /* Distant hangar door / wall detail */
-        .hangar-door {
-            position: absolute;
-            bottom: 22%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(70vw, 920px);
-            height: 38%;
-            pointer-events: none;
-            z-index: 0;
-            background:
-                linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.15) 100%),
-                repeating-linear-gradient(
-                    90deg,
-                    #555550 0px,
-                    #555550 48px,
-                    #4a4a45 48px,
-                    #4a4a45 52px
-                );
-            border: 3px solid #3a3a36;
-            border-bottom: none;
-            opacity: 0.35;
-            box-shadow: inset 0 20px 40px rgba(0, 0, 0, 0.35);
-        }
-
-        /* Floor */
+        /* Soft floor only — no dark rectangular door/panel behind the CRT */
         .hangar-floor {
             position: absolute;
             left: 0;
             right: 0;
             bottom: 0;
-            height: 28%;
+            height: 22%;
             z-index: 0;
-            background:
-                linear-gradient(180deg, transparent 0%, rgba(30, 30, 28, 0.4) 30%, #2a2a28 100%),
-                repeating-linear-gradient(
-                    90deg,
-                    transparent 0,
-                    transparent 60px,
-                    rgba(255, 255, 255, 0.015) 60px,
-                    rgba(255, 255, 255, 0.015) 61px
-                );
+            background: linear-gradient(180deg, transparent 0%, rgba(30, 30, 28, 0.35) 100%);
             pointer-events: none;
         }
 
-        /* —— Scene: CRT only (desk is full-bleed under it) —— */
-        .scene {
+        /*
+         * One assembly: CRT base sits flush on desk top edge (document flow).
+         * Desk is nearly full viewport width; legs hang past the bottom edge.
+         */
+        .assembly {
             position: relative;
             z-index: 5;
+            width: 97vw;
+            max-width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* Lift CRT so its base sits on the desk top edge */
-            transform: scale(0.88) translateY(-6%);
-            transform-origin: center center;
-            margin-bottom: 4vh;
+            /* Legs extend outside the viewport */
+            margin-bottom: calc(-1 * min(38vh, 280px));
+            pointer-events: none;
+        }
+
+        .assembly .crt-computer {
+            pointer-events: auto;
+        }
+
+        /* —— CRT: scale from base so feet stay planted on the desk —— */
+        .crt-computer {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 6;
+            transform: scale(0.86);
+            transform-origin: bottom center;
+            /* Overlap 1px so base sits ON the top edge, not floating */
+            margin-bottom: -1px;
         }
 
         @media (max-width: 1100px) {
-            .scene { transform: scale(0.74) translateY(-4%); }
+            .crt-computer { transform: scale(0.72); }
         }
         @media (max-width: 900px) {
-            .scene { transform: scale(0.58) translateY(-2%); }
+            .crt-computer { transform: scale(0.56); }
         }
         @media (max-height: 800px) {
-            .scene { transform: scale(0.72) translateY(-8%); }
+            .crt-computer { transform: scale(0.7); }
         }
         @media (max-height: 650px) {
-            .scene { transform: scale(0.55) translateY(-6%); }
+            .crt-computer { transform: scale(0.54); }
         }
 
-        /*
-         * Desk: side elevation under CRT.
-         * Almost full viewport width; legs run off the bottom of the screen.
-         * No contact shadow blob, no props.
-         */
         .desk {
-            position: absolute;
-            left: 1.5vw;
-            right: 1.5vw;
-            bottom: 0;
-            width: auto;
+            position: relative;
+            width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             z-index: 4;
-            /* Push the desk so the apron sits under the CRT and legs leave the viewport */
-            transform: translateY(55%);
             pointer-events: none;
         }
 
         /* Thin strip = tabletop edge seen from the side */
         .desk-top-edge {
             width: 100%;
-            height: 14px;
+            height: 16px;
             background: linear-gradient(
                 180deg,
                 #7a6a58 0%,
@@ -239,13 +212,13 @@
             border-left: 1px solid #2a241e;
             border-right: 1px solid #2a241e;
             position: relative;
-            z-index: 3;
+            z-index: 5;
         }
 
-        /* Thick front face of the tabletop (side view of board thickness) */
+        /* Thick front face of the tabletop */
         .desk-apron {
             width: 100%;
-            height: 72px;
+            height: 80px;
             background:
                 repeating-linear-gradient(
                     90deg,
@@ -264,7 +237,6 @@
             border-left: 1px solid #1a1612;
             border-right: 1px solid #1a1612;
             border-bottom: 1px solid #120f0c;
-            box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.3);
             position: relative;
             z-index: 2;
         }
@@ -291,28 +263,18 @@
             display: flex;
             justify-content: space-between;
             width: 94%;
-            /* Tall enough that bottoms sit well past the viewport edge */
-            height: min(42vh, 320px);
+            height: min(48vh, 360px);
             margin-top: 0;
             pointer-events: none;
             z-index: 1;
         }
 
         .desk-legs span {
-            width: 36px;
+            width: 64px;
             height: 100%;
             background: linear-gradient(90deg, #1a1612 0%, #3a322a 35%, #2a241e 70%, #151210 100%);
-            border-radius: 0 0 2px 2px;
+            border-radius: 0 0 3px 3px;
             position: relative;
-        }
-
-        /* —— CRT chassis (stands above desk, base rests on top edge) —— */
-        .crt-computer {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            z-index: 6;
         }
 
         .crt-case {
@@ -320,11 +282,11 @@
                 linear-gradient(145deg, var(--bezel-light) 0%, var(--plastic) 28%, var(--bezel) 55%, var(--bezel-dark) 100%);
             border-radius: 18px 18px 14px 14px;
             padding: 18px 22px 14px;
+            /* Soft depth only — no large dark rectangular halo behind the case */
             box-shadow:
                 0 1px 0 rgba(255, 255, 255, 0.35) inset,
-                0 -2px 6px rgba(0, 0, 0, 0.2) inset,
-                8px 12px 28px rgba(0, 0, 0, 0.45),
-                -4px -2px 12px rgba(255, 255, 255, 0.08);
+                0 -2px 4px rgba(0, 0, 0, 0.15) inset,
+                2px 4px 10px rgba(0, 0, 0, 0.28);
             border: 1px solid #9a9080;
             position: relative;
         }
@@ -581,17 +543,16 @@
         }
 
         .crt-base {
-            width: 240px;
-            height: 20px;
+            width: 260px;
+            height: 22px;
             margin-top: -1px;
             background: linear-gradient(180deg, #b0a690, #8a8070 55%, #6a6458);
-            border-radius: 50% 50% 6px 6px / 60% 60% 40% 40%;
+            border-radius: 50% 50% 4px 4px / 55% 55% 45% 45%;
             box-shadow:
-                0 2px 0 #4a4438,
-                0 6px 12px rgba(0, 0, 0, 0.45),
+                0 1px 0 #4a4438,
                 inset 0 1px 0 rgba(255, 255, 255, 0.25);
             position: relative;
-            z-index: 3;
+            z-index: 7;
         }
     </style>
 </head>
@@ -605,11 +566,10 @@
         <div class="lamp lamp-a" aria-hidden="true"></div>
         <div class="lamp lamp-b" aria-hidden="true"></div>
         <div class="lamp lamp-c" aria-hidden="true"></div>
-        <div class="hangar-door" aria-hidden="true"></div>
         <div class="hangar-floor" aria-hidden="true"></div>
 
-        <div class="scene">
-            <!-- CRT stands freely; its base rests on the desk below -->
+        <!-- CRT + desk one stack: base rests on desk top edge -->
+        <div class="assembly">
             <div class="crt-computer">
                 <div class="crt-case">
                     <div class="crt-vents" aria-hidden="true">
@@ -673,13 +633,12 @@
                 <div class="crt-neck" aria-hidden="true"></div>
                 <div class="crt-base" aria-hidden="true"></div>
             </div>
-        </div>
 
-        <!-- Full-width desk under CRT; legs continue past the bottom of the viewport -->
-        <div class="desk" aria-hidden="true">
-            <div class="desk-top-edge"></div>
-            <div class="desk-apron"></div>
-            <div class="desk-legs"><span></span><span></span></div>
+            <div class="desk" aria-hidden="true">
+                <div class="desk-top-edge"></div>
+                <div class="desk-apron"></div>
+                <div class="desk-legs"><span></span><span></span></div>
+            </div>
         </div>
     </div>
 
