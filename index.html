@@ -104,29 +104,32 @@
 
         /* Hanging industrial fixtures + soft downward light cones */
         .lamp {
+            --bulb-w: 56px;   /* bright ellipse width = cone start width */
+            --cone-w: 300px;
             position: absolute;
             top: 11%;
-            /* Fixture sized so bright element matches cone top (~60px aperture) */
             width: 72px;
             height: 40px;
             border-radius: 5px 5px 42% 42%;
             background: linear-gradient(180deg, #3c3c38 0%, #1c1c1a 100%);
             border: 1px solid #2a2a28;
-            /* No omnidirectional halo — light only falls as a cone below */
             box-shadow: none;
             z-index: 2;
             overflow: visible;
         }
 
-        /* Soft cone of light (wide at the bottom, fades out) */
+        /*
+         * Cone starts at the bright ellipse: top aperture = --bulb-w,
+         * then widens downward. (clip-path % is relative to --cone-w)
+         */
         .lamp::before {
             content: '';
             position: absolute;
-            /* Start under the bulb so the cone doesn’t spill past the fixture */
-            top: 100%;
+            /* Top of cone sits on the bright ellipse, beam falls downward */
+            top: calc(100% - 3px);
             left: 50%;
             transform: translateX(-50%);
-            width: 300px;
+            width: var(--cone-w);
             height: min(72vh, 640px);
             background: linear-gradient(
                 180deg,
@@ -137,24 +140,27 @@
                 rgba(255, 200, 110, 0.015) 72%,
                 transparent 100%
             );
-            /*
-             * Top aperture narrower than the bright bulb; blur expands the edge
-             * so a tight top (~12%) still reads as matching the fixture.
-             */
-            clip-path: polygon(44% 0%, 56% 0%, 100% 100%, 0% 100%);
-            filter: blur(14px);
+            /* top width = --bulb-w; bottom = full cone width */
+            clip-path: polygon(
+                calc(50% - var(--bulb-w) / 2) 0%,
+                calc(50% + var(--bulb-w) / 2) 0%,
+                100% 100%,
+                0% 100%
+            );
+            filter: blur(12px);
             opacity: 0.9;
             pointer-events: none;
             z-index: -1;
         }
 
-        /* Bright bulb — wider to match cone entrance */
+        /* Bright emission ellipse — same width as cone start */
         .lamp::after {
             content: '';
             position: absolute;
-            left: 12%;
-            right: 12%;
+            left: 50%;
             bottom: -3px;
+            transform: translateX(-50%);
+            width: var(--bulb-w);
             height: 12px;
             border-radius: 50%;
             background: rgba(255, 242, 210, 0.85);
@@ -162,18 +168,22 @@
                 0 2px 8px 1px rgba(255, 230, 170, 0.4),
                 0 4px 14px 2px rgba(255, 220, 150, 0.15);
             pointer-events: none;
+            z-index: 1;
         }
 
         .lamp-a { left: 18%; }
-        .lamp-b { left: 50%; transform: translateX(-50%); }
+        .lamp-b {
+            left: 50%;
+            transform: translateX(-50%);
+            --cone-w: 340px;
+            /* same --bulb-w: cone still starts at the ellipse, only the base is wider */
+        }
         .lamp-c { right: 18%; left: auto; }
 
-        /* Middle lamp: same cone strength, tighter top (wider base needs narrower %) */
+        /* Middle lamp: longer / stronger beam only — same emission width */
         .lamp-b::before {
-            width: 340px;
             height: min(78vh, 700px);
             opacity: 1;
-            clip-path: polygon(46% 0%, 54% 0%, 100% 100%, 0% 100%);
             background: linear-gradient(
                 180deg,
                 rgba(255, 240, 205, 0.42) 0%,
