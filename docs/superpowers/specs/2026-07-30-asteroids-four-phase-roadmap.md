@@ -80,10 +80,10 @@
 (hard na końcu, bo buduje na trudniejszych UFO i combo).
 
 **Kryterium ukończenia fazy 2**
-- [ ] Combo czytelne i zbalansowane (nie farmowalne w nieskończoność)
-- [ ] UFO nie spawnuje się w „dziwnych” stackach (timer in-game już jest)
-- [ ] Hyperspace nadal ma ryzyko albo koszt
-- [ ] Hard jest opcją, nie domyślną pułapką dla nowych graczy
+- [x] Combo czytelne i zbalansowane (nie farmowalne w nieskończoność)
+- [x] UFO nie spawnuje się w „dziwnych” stackach (timer in-game już jest)
+- [x] Hyperspace nadal ma ryzyko albo koszt
+- [x] Hard jest opcją, nie domyślną pułapką dla nowych graczy
 
 **Szacunek:** średni–duży (balans + edge cases).
 

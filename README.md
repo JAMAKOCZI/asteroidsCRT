@@ -12,14 +12,16 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 
 ## Features
 
-- Vector ship with thrust, turn, fire, and **hyperspace**
+- Vector ship with thrust, turn, fire, and **hyperspace** (tap = risky, hold = safe)
 - Asteroids that split into smaller pieces (classic point values)
 - Levels with rising difficulty; extra ship each level + every 10 000 points
-- Large / small UFO saucers (from level 2+) with tougher AI on higher levels
-- Power-ups: **S**hield, **R**apid fire, **T**riple shot
-- Particle FX, floating scores, CRT scanlines / green glow
+- Combo score multiplier for kill chains
+- Large / small / **boss** UFO saucers (boss every 5 levels)
+- Power-ups: **S**hield, **R**apid, **T**riple, **W**ide, s**L**ow field
+- Optional **Hard** mode from the title screen (`G`)
+- CRT phosphor palette by level, hangar chrome, Web Audio SFX
 - High scores with initials (top 10, `localStorage`)
-- Title screen, pause, Web Audio SFX
+- Title screen, pause, mute / volume
 
 ---
 
@@ -30,9 +32,10 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 | **Left / Right** or **A / D** | Turn |
 | **Up / W** | Boost / thrust |
 | **Space** | Fire (hold for auto-fire with Rapid) |
-| **H** or **Down** | Hyperspace (risky teleport; cooldown) |
+| **H** or **Down** | Hyperspace — tap risky, hold safe (longer CD) |
 | **P** | Pause / resume |
 | **A key** (not Tab/modifiers) | Start from title screen |
+| **G** / **1** / **2** | Toggle hard / normal / hard (title) |
 | **[** **]** or **,** **.** | Cycle phosphor preview (title) |
 | **M** | Mute / unmute |
 | **−** **/** **=** | Volume down / up |
