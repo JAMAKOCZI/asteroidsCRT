@@ -33,6 +33,9 @@ Repository: [github.com/JAMAKOCZI/asteroidsCRT](https://github.com/JAMAKOCZI/ast
 | **H** or **Down** | Hyperspace (risky teleport; cooldown) |
 | **P** | Pause / resume |
 | **A key** (not Tab/modifiers) | Start from title screen |
+| **[** **]** or **,** **.** | Cycle phosphor preview (title) |
+| **M** | Mute / unmute |
+| **−** **/** **=** | Volume down / up |
 | **R** | Restart (after game over) |
 | **A–Z**, **Enter** | Enter high-score initials |
 | **Esc** | Skip high-score entry |

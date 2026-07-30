@@ -54,10 +54,10 @@
 | 12 | **Barrel / fringe** | lekki filter na `.crt-screen`; wyłączany przy `prefers-reduced-motion` lub „low FX” |
 
 **Kryterium ukończenia fazy 1**
-- [ ] Mute działa i przetrwa reload
-- [ ] Title pokazuje najlepszy wynik
-- [ ] Zmiana poziomu ma czytelny feedback koloru + dźwięku
-- [ ] Brak regresji w sterowaniu / HUD (level w prawym rogu, help tylko title/pause)
+- [x] Mute działa i przetrwa reload
+- [x] Title pokazuje najlepszy wynik
+- [x] Zmiana poziomu ma czytelny feedback koloru + dźwięku
+- [x] Brak regresji w sterowaniu / HUD (level w prawym rogu, help tylko title/pause)
 
 **Szacunek:** mały–średni (głównie CSS + Web Audio + title render).
 

@@ -811,6 +811,51 @@
                 0 0 14px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.5),
                 inset 0 -1px 2px rgba(0, 0, 0, 0.45);
             border: 1px solid rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.25);
+            animation: led-pulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes led-pulse {
+            0%, 100% { opacity: 1; filter: brightness(1); }
+            50% { opacity: 0.72; filter: brightness(0.85); }
+        }
+
+        /* Small warranty sticker on the plastic case */
+        .crt-sticker {
+            position: absolute;
+            right: 28px;
+            bottom: 52px;
+            z-index: 3;
+            pointer-events: none;
+            width: 54px;
+            height: 28px;
+            border-radius: 2px;
+            background:
+                linear-gradient(165deg, #f2e8d0 0%, #d8c8a8 55%, #c4b090 100%);
+            border: 1px solid rgba(80, 60, 30, 0.35);
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.45);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(-6deg);
+            font-family: 'Courier New', monospace;
+            line-height: 1.1;
+        }
+
+        .crt-sticker span {
+            font-size: 6px;
+            letter-spacing: 0.14em;
+            color: #5a4030;
+            text-transform: uppercase;
+        }
+
+        .crt-sticker strong {
+            font-size: 8px;
+            letter-spacing: 0.06em;
+            color: #3a2818;
+            margin-top: 1px;
         }
 
         /* Screen well (recessed bezel) */
@@ -859,7 +904,21 @@
             box-shadow:
                 0 0 0 1px #050505,
                 0 0 24px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.14),
-                inset 0 0 30px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.08);
+                inset 0 0 30px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.08),
+                /* subtle chromatic fringe */
+                inset 1px 0 0 rgba(255, 40, 40, 0.045),
+                inset -1px 0 0 rgba(40, 120, 255, 0.04);
+            transition: box-shadow 0.12s ease-out;
+        }
+
+        .crt-screen.crt-flash {
+            box-shadow:
+                0 0 0 1px #050505,
+                0 0 48px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.55),
+                0 0 80px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.28),
+                inset 0 0 40px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.22),
+                inset 1px 0 0 rgba(255, 40, 40, 0.08),
+                inset -1px 0 0 rgba(40, 120, 255, 0.07);
         }
 
         canvas {
@@ -870,8 +929,8 @@
             image-rendering: pixelated;
             border: none;
             border-radius: 4px;
-            /* Slight CRT screen brightness only */
-            filter: brightness(1.12);
+            /* Slight CRT brightness + soft contrast (barrel-ish vignette is in overlay) */
+            filter: brightness(1.12) contrast(1.04);
         }
 
         /* Glass glare + scanlines over game only */
@@ -901,14 +960,37 @@
             box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
         }
 
-        /* Slight CRT curvature vignette */
+        /* Slight CRT curvature vignette + soft barrel darkening at edges */
         .crt-overlay::after {
             content: '';
             position: absolute;
             inset: 0;
             border-radius: 4px;
             box-shadow: inset 0 0 80px 12px rgba(0, 0, 0, 0.35);
+            background: radial-gradient(
+                ellipse 92% 88% at 50% 50%,
+                transparent 55%,
+                rgba(0, 0, 0, 0.18) 100%
+            );
             pointer-events: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .crt-led {
+                animation: none !important;
+            }
+            .crt-screen {
+                box-shadow:
+                    0 0 0 1px #050505,
+                    0 0 24px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.14),
+                    inset 0 0 30px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.08);
+            }
+            canvas {
+                filter: brightness(1.12);
+            }
+            .crt-overlay::after {
+                background: none;
+            }
         }
 
         .ui {
@@ -1086,8 +1168,35 @@
         .crt-model {
             font-size: 9px;
             color: #5a5448;
-            letter-spacing: 0.22em;
+            letter-spacing: 0.16em;
             text-shadow: 0 1px 0 rgba(255,255,255,0.15);
+            min-width: 9em;
+            text-align: center;
+        }
+
+        .crt-model .crt-model-phos {
+            color: rgb(var(--crt-r), var(--crt-g), var(--crt-b));
+            text-shadow: 0 0 6px rgba(var(--crt-r), var(--crt-g), var(--crt-b), 0.35);
+            letter-spacing: 0.1em;
+        }
+
+        .audio-pill {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            pointer-events: none;
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            color: var(--crt-dim);
+            text-shadow: 0 0 8px var(--crt-dim);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .audio-pill.is-visible {
+            opacity: 1;
         }
 
         /* Monitor neck / stand */
@@ -1179,6 +1288,10 @@
             <div class="crt-computer">
                 <div class="crt-case">
                     <div class="crt-grain" aria-hidden="true"></div>
+                    <div class="crt-sticker" aria-hidden="true">
+                        <span>Inspected</span>
+                        <strong>VECTOR</strong>
+                    </div>
                     <div class="crt-vents" aria-hidden="true">
                         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -1203,12 +1316,14 @@
                                     <div>LEVEL: <span id="level">1</span></div>
                                     <div class="ui-phosphor" id="phosphorLabel">Green</div>
                                 </div>
+                                <div class="audio-pill" id="audioPill" aria-live="polite">MUTED</div>
                                 <div class="controls is-visible" id="controlsHelp" aria-hidden="true">
                                     LEFT/RIGHT or A/D: Turn<br>
                                     UP / W: Boost<br>
                                     SPACE: Fire<br>
                                     H / DOWN: Hyperspace<br>
-                                    P: Pause
+                                    P: Pause · M: Mute · −/=: Volume<br>
+                                    Title: [ ] phosphor preview
                                 </div>
                                 <div id="gameOver" class="game-over" style="display: none;">
                                     <div id="gameOverText">GAME OVER</div>
@@ -1242,7 +1357,7 @@
                             <i></i><i></i><i></i><i></i><i></i><i></i>
                             <i></i><i></i><i></i><i></i><i></i><i></i>
                         </div>
-                        <div class="crt-model">VM-800 CRT</div>
+                        <div class="crt-model" id="crtModelLabel">VM-800 · <span class="crt-model-phos">GREEN</span></div>
                         <div class="crt-power-btn" title="Power" aria-hidden="true"></div>
                     </div>
                 </div>
@@ -1270,6 +1385,9 @@
         const levelElement = document.getElementById('level');
         const phosphorLabel = document.getElementById('phosphorLabel');
         const controlsHelp = document.getElementById('controlsHelp');
+        const audioPill = document.getElementById('audioPill');
+        const crtModelLabel = document.getElementById('crtModelLabel');
+        const crtScreenEl = document.querySelector('.crt-screen');
         const gameOverElement = document.getElementById('gameOver');
         const gameOverText = document.getElementById('gameOverText');
         const initialsPrompt = document.getElementById('initialsPrompt');
@@ -1303,8 +1421,11 @@
             bg: CRT_PHOSPHORS[0].bg,
             r: 0, g: 255, b: 102,
             dim: '#00aa44',
-            dimR: 0, dimG: 170, dimB: 68
+            dimR: 0, dimG: 170, dimB: 68,
+            index: 0
         };
+        let titlePhosphorIndex = 0;
+        let crtFlashTimer = 0;
 
         function hexToRgb(hex) {
             const h = String(hex).replace('#', '');
@@ -1321,8 +1442,22 @@
             return CRT_PHOSPHORS[i];
         }
 
-        function applyCrtTheme(level) {
-            const p = phosphorForLevel(level == null ? 1 : level);
+        function triggerCrtFlash() {
+            if (!crtScreenEl) return;
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                return;
+            }
+            crtScreenEl.classList.remove('crt-flash');
+            // reflow so re-adding restarts the visual pulse
+            void crtScreenEl.offsetWidth;
+            crtScreenEl.classList.add('crt-flash');
+            crtFlashTimer = 14; // frames @ 60fps
+        }
+
+        function applyCrtThemeByIndex(index, opts) {
+            const n = CRT_PHOSPHORS.length;
+            const i = ((index % n) + n) % n;
+            const p = CRT_PHOSPHORS[i];
             const rgb = hexToRgb(p.hex);
             const dimR = Math.round(rgb.r * 0.55);
             const dimG = Math.round(rgb.g * 0.55);
@@ -1334,7 +1469,8 @@
                 bg: p.bg,
                 r: rgb.r, g: rgb.g, b: rgb.b,
                 dim: dim,
-                dimR: dimR, dimG: dimG, dimB: dimB
+                dimR: dimR, dimG: dimG, dimB: dimB,
+                index: i
             };
             const host = document.querySelector('.crt-computer');
             if (host) {
@@ -1347,6 +1483,30 @@
             if (phosphorLabel) {
                 phosphorLabel.textContent = p.name;
             }
+            if (crtModelLabel) {
+                crtModelLabel.textContent = '';
+                crtModelLabel.appendChild(document.createTextNode('VM-800 · '));
+                const phSpan = document.createElement('span');
+                phSpan.className = 'crt-model-phos';
+                phSpan.textContent = p.name.toUpperCase();
+                crtModelLabel.appendChild(phSpan);
+            }
+            if (opts && opts.flash) {
+                triggerCrtFlash();
+            }
+        }
+
+        function applyCrtTheme(level, opts) {
+            const n = CRT_PHOSPHORS.length;
+            const i = ((Math.max(1, level == null ? 1 : level | 0) - 1) % n + n) % n;
+            applyCrtThemeByIndex(i, opts);
+        }
+
+        function cycleTitlePhosphor(dir) {
+            const n = CRT_PHOSPHORS.length;
+            titlePhosphorIndex = (titlePhosphorIndex + dir + n) % n;
+            applyCrtThemeByIndex(titlePhosphorIndex, { flash: true });
+            sfxUiBlip();
         }
 
         function crtRgba(alpha) {
@@ -1409,66 +1569,284 @@
         let lastFrameTime = 0;
         let lastThrustSound = 0;
 
-        // --- Web Audio ---
+        // --- Web Audio (master gain + mute/volume in localStorage) ---
+        const AUDIO_STORAGE_KEY = 'asteroidsAudio';
         let audioCtx = null;
+        let masterGainNode = null;
+        let humOsc = null;
+        let humGain = null;
+        let audioPillHideTimer = 0;
+
+        function loadAudioSettings() {
+            try {
+                const raw = localStorage.getItem(AUDIO_STORAGE_KEY);
+                if (!raw) return { muted: false, volume: 0.75 };
+                const o = JSON.parse(raw);
+                let vol = Number(o.volume);
+                if (!Number.isFinite(vol)) vol = 0.75;
+                vol = Math.max(0, Math.min(1, vol));
+                return { muted: !!o.muted, volume: vol };
+            } catch (e) {
+                return { muted: false, volume: 0.75 };
+            }
+        }
+
+        let audioSettings = loadAudioSettings();
+
+        function saveAudioSettings() {
+            try {
+                localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify({
+                    muted: audioSettings.muted,
+                    volume: audioSettings.volume
+                }));
+            } catch (e) { /* private mode */ }
+        }
+
+        function effectiveMasterVolume() {
+            if (audioSettings.muted) return 0;
+            return audioSettings.volume;
+        }
 
         function ensureAudio() {
             const AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) return null;
-            if (!audioCtx) audioCtx = new AC();
+            if (!audioCtx) {
+                audioCtx = new AC();
+                masterGainNode = audioCtx.createGain();
+                masterGainNode.gain.value = effectiveMasterVolume();
+                masterGainNode.connect(audioCtx.destination);
+            }
             if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
+                audioCtx.resume().catch(function () {});
+            }
+            if (masterGainNode) {
+                masterGainNode.gain.value = effectiveMasterVolume();
             }
             return audioCtx;
         }
 
-        function playTone(freq, duration, type, volume) {
+        function audioOut() {
             const ctxA = ensureAudio();
-            if (!ctxA) return;
-            const osc = ctxA.createOscillator();
-            const gain = ctxA.createGain();
+            if (!ctxA || !masterGainNode) return null;
+            if (audioSettings.muted) return null;
+            return { ctx: ctxA, out: masterGainNode };
+        }
+
+        function updateAudioPill(forceText) {
+            if (!audioPill) return;
+            if (forceText) {
+                audioPill.textContent = forceText;
+                audioPill.classList.add('is-visible');
+                audioPillHideTimer = 90;
+                return;
+            }
+            if (audioSettings.muted) {
+                audioPill.textContent = 'MUTED';
+                audioPill.classList.add('is-visible');
+                audioPillHideTimer = 0;
+            } else {
+                audioPill.classList.remove('is-visible');
+            }
+        }
+
+        function applyMasterGain() {
+            if (masterGainNode) {
+                masterGainNode.gain.value = effectiveMasterVolume();
+            }
+            if (humGain && audioCtx) {
+                humGain.gain.setTargetAtTime(
+                    audioSettings.muted ? 0 : 0.0035 * audioSettings.volume,
+                    audioCtx.currentTime,
+                    0.05
+                );
+            }
+            updateAudioPill(
+                audioSettings.muted
+                    ? 'MUTED'
+                    : 'VOL ' + Math.round(audioSettings.volume * 100) + '%'
+            );
+        }
+
+        function toggleMute() {
+            ensureAudio();
+            audioSettings.muted = !audioSettings.muted;
+            saveAudioSettings();
+            applyMasterGain();
+            if (!audioSettings.muted) {
+                startCrtHum();
+                sfxUiBlip();
+            }
+        }
+
+        function adjustVolume(delta) {
+            ensureAudio();
+            audioSettings.volume = Math.max(0, Math.min(1, audioSettings.volume + delta));
+            if (audioSettings.volume > 0 && audioSettings.muted) {
+                audioSettings.muted = false;
+            }
+            if (audioSettings.volume === 0) {
+                audioSettings.muted = true;
+            }
+            saveAudioSettings();
+            applyMasterGain();
+            if (!audioSettings.muted) {
+                startCrtHum();
+                sfxUiBlip();
+            }
+        }
+
+        function startCrtHum() {
+            if (audioSettings.muted) return;
+            const ctxA = ensureAudio();
+            if (!ctxA || !masterGainNode) return;
+            if (humOsc) {
+                if (humGain) {
+                    humGain.gain.setTargetAtTime(
+                        0.0035 * audioSettings.volume,
+                        ctxA.currentTime,
+                        0.05
+                    );
+                }
+                return;
+            }
+            humOsc = ctxA.createOscillator();
+            humGain = ctxA.createGain();
+            humOsc.type = 'sine';
+            humOsc.frequency.value = 58;
+            humGain.gain.value = 0.0035 * audioSettings.volume;
+            humOsc.connect(humGain);
+            humGain.connect(masterGainNode);
+            humOsc.start();
+        }
+
+        function playTone(freq, duration, type, volume) {
+            const io = audioOut();
+            if (!io) return;
+            const osc = io.ctx.createOscillator();
+            const gain = io.ctx.createGain();
             osc.type = type || 'square';
             osc.frequency.value = freq;
-            const now = ctxA.currentTime;
-            const vol = volume == null ? 0.04 : volume;
+            const now = io.ctx.currentTime;
+            const vol = (volume == null ? 0.04 : volume);
             gain.gain.setValueAtTime(vol, now);
             gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
             osc.connect(gain);
-            gain.connect(ctxA.destination);
+            gain.connect(io.out);
+            osc.start(now);
+            osc.stop(now + duration);
+        }
+
+        function playSweep(startF, endF, duration, type, volume) {
+            const io = audioOut();
+            if (!io) return;
+            const osc = io.ctx.createOscillator();
+            const gain = io.ctx.createGain();
+            osc.type = type || 'sawtooth';
+            const now = io.ctx.currentTime;
+            const vol = volume == null ? 0.04 : volume;
+            const a = Math.max(1, startF);
+            const b = Math.max(1, endF);
+            osc.frequency.setValueAtTime(a, now);
+            osc.frequency.exponentialRampToValueAtTime(b, now + duration);
+            gain.gain.setValueAtTime(vol, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.connect(gain);
+            gain.connect(io.out);
             osc.start(now);
             osc.stop(now + duration);
         }
 
         function playNoise(duration, volume) {
-            const ctxA = ensureAudio();
-            if (!ctxA) return;
-            const len = Math.max(1, Math.floor(ctxA.sampleRate * duration));
-            const buffer = ctxA.createBuffer(1, len, ctxA.sampleRate);
+            const io = audioOut();
+            if (!io) return;
+            const len = Math.max(1, Math.floor(io.ctx.sampleRate * duration));
+            const buffer = io.ctx.createBuffer(1, len, io.ctx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < len; i++) {
                 data[i] = (Math.random() * 2 - 1) * (1 - i / len);
             }
-            const src = ctxA.createBufferSource();
+            const src = io.ctx.createBufferSource();
             src.buffer = buffer;
-            const gain = ctxA.createGain();
+            const gain = io.ctx.createGain();
             gain.gain.value = volume == null ? 0.06 : volume;
             src.connect(gain);
-            gain.connect(ctxA.destination);
+            gain.connect(io.out);
             src.start();
         }
 
-        function sfxShoot() { playTone(720, 0.05, 'square', 0.03); }
-        function sfxExplode() { playNoise(0.18, 0.07); }
-        function sfxDeath() { playNoise(0.28, 0.09); playTone(90, 0.25, 'sawtooth', 0.04); }
-        function sfxAlienHit() { playTone(520, 0.08, 'square', 0.05); playTone(780, 0.1, 'square', 0.04); }
-        function sfxExtraLife() { playTone(440, 0.08, 'square', 0.05); playTone(660, 0.1, 'square', 0.05); playTone(880, 0.12, 'square', 0.05); }
-        function sfxHyperspace() { playTone(200, 0.15, 'sawtooth', 0.04); playNoise(0.12, 0.04); }
-        function sfxPowerup() { playTone(600, 0.06, 'square', 0.04); playTone(900, 0.1, 'square', 0.04); }
+        function sfxUiBlip() {
+            playTone(880, 0.04, 'triangle', 0.025);
+        }
+
+        function sfxShoot() {
+            playTone(820, 0.045, 'square', 0.028);
+            playTone(410, 0.03, 'triangle', 0.012);
+        }
+
+        function sfxExplode() {
+            playNoise(0.2, 0.075);
+            playTone(95, 0.14, 'sawtooth', 0.03);
+        }
+
+        function sfxDeath() {
+            playNoise(0.32, 0.095);
+            playTone(90, 0.28, 'sawtooth', 0.045);
+            playTone(55, 0.34, 'triangle', 0.028);
+        }
+
+        function sfxAlienHitLarge() {
+            playTone(260, 0.12, 'square', 0.05);
+            playTone(160, 0.16, 'sawtooth', 0.035);
+            playNoise(0.1, 0.04);
+        }
+
+        function sfxAlienHitSmall() {
+            playTone(780, 0.06, 'square', 0.045);
+            playTone(1180, 0.08, 'triangle', 0.03);
+        }
+
+        function sfxAlienHit(type) {
+            if (type === 'small') sfxAlienHitSmall();
+            else sfxAlienHitLarge();
+        }
+
+        function sfxExtraLife() {
+            playTone(440, 0.07, 'square', 0.04);
+            playTone(554, 0.08, 'square', 0.04);
+            playTone(659, 0.1, 'square', 0.045);
+            playTone(880, 0.14, 'triangle', 0.04);
+        }
+
+        function sfxHyperspace() {
+            playSweep(180, 920, 0.18, 'sawtooth', 0.04);
+            playNoise(0.14, 0.035);
+        }
+
+        function sfxPowerup() {
+            playTone(520, 0.05, 'square', 0.035);
+            playTone(780, 0.07, 'triangle', 0.04);
+            playTone(1040, 0.1, 'square', 0.03);
+        }
+
+        function sfxLevelUp() {
+            playTone(392, 0.07, 'square', 0.035);
+            playTone(523, 0.08, 'square', 0.04);
+            playTone(659, 0.1, 'triangle', 0.04);
+            playTone(784, 0.14, 'square', 0.035);
+        }
+
+        function sfxGameOver() {
+            playTone(330, 0.18, 'sawtooth', 0.04);
+            playTone(247, 0.22, 'sawtooth', 0.035);
+            playTone(196, 0.32, 'triangle', 0.03);
+            playNoise(0.2, 0.04);
+        }
+
         function sfxThrust() {
             const now = performance.now();
-            if (now - lastThrustSound < 80) return;
+            if (now - lastThrustSound < 90) return;
             lastThrustSound = now;
-            playNoise(0.06, 0.015);
+            playNoise(0.055, 0.012);
         }
 
         // --- Input ---
@@ -1500,6 +1878,25 @@
             );
         }
 
+        function handleAudioHotkeys(e) {
+            if (e.code === 'KeyM') {
+                e.preventDefault();
+                toggleMute();
+                return true;
+            }
+            if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+                e.preventDefault();
+                adjustVolume(-0.1);
+                return true;
+            }
+            if (e.code === 'Equal' || e.code === 'NumpadAdd') {
+                e.preventDefault();
+                adjustVolume(0.1);
+                return true;
+            }
+            return false;
+        }
+
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
             if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' ||
@@ -1507,9 +1904,31 @@
                 e.preventDefault();
             }
 
+            // Mute/volume available almost everywhere (not while typing initials A–Z conflicts avoided:
+            // M is initials letter — block audio hotkeys during initials entry)
+            if (!gameState.enteringInitials && handleAudioHotkeys(e)) {
+                return;
+            }
+
             if (gameState.mode === 'title') {
                 if (isModifierOnlyOrBrowserChord(e)) return;
+                // Phosphor preview — does not start the run
+                if (e.code === 'BracketLeft' || e.code === 'Comma') {
+                    e.preventDefault();
+                    ensureAudio();
+                    startCrtHum();
+                    cycleTitlePhosphor(-1);
+                    return;
+                }
+                if (e.code === 'BracketRight' || e.code === 'Period') {
+                    e.preventDefault();
+                    ensureAudio();
+                    startCrtHum();
+                    cycleTitlePhosphor(1);
+                    return;
+                }
                 ensureAudio();
+                startCrtHum();
                 startGame();
                 return;
             }
@@ -1532,6 +1951,7 @@
 
             if (e.code === 'KeyR' && gameState.gameOver) {
                 ensureAudio();
+                startCrtHum();
                 restartGame();
             }
         });
@@ -1902,7 +2322,8 @@
         function nextLevel() {
             gameState.level++;
             gameState.lives++;
-            applyCrtTheme(gameState.level);
+            applyCrtTheme(gameState.level, { flash: true });
+            sfxLevelUp();
             showMessage(phosphorForLevel(gameState.level).name.toUpperCase(), 90);
             alienShip = null;
             alienMissiles = [];
@@ -1918,6 +2339,7 @@
             gameState.mode = 'gameover';
             gameOverElement.style.display = 'block';
             updateControlsHelp();
+            sfxGameOver();
 
             if (qualifiesForHighScore(gameState.score)) {
                 gameState.enteringInitials = true;
@@ -2081,6 +2503,24 @@
         }
 
         function update(dt) {
+            // CRT flash / audio pill (all modes)
+            if (crtFlashTimer > 0) {
+                crtFlashTimer -= dt * TARGET_FPS;
+                if (crtFlashTimer <= 0) {
+                    crtFlashTimer = 0;
+                    if (crtScreenEl) crtScreenEl.classList.remove('crt-flash');
+                }
+            }
+            if (audioPillHideTimer > 0) {
+                audioPillHideTimer -= dt * TARGET_FPS;
+                if (audioPillHideTimer <= 0) {
+                    audioPillHideTimer = 0;
+                    if (!audioSettings.muted && audioPill) {
+                        audioPill.classList.remove('is-visible');
+                    }
+                }
+            }
+
             if (gameState.mode === 'title') {
                 updateTitleAmbient(dt);
                 return;
@@ -2253,7 +2693,7 @@
                         alienX = alienShip.x;
                         alienY = alienShip.y;
                         createParticles(alienShip.x, alienShip.y, 12);
-                        sfxAlienHit();
+                        sfxAlienHit(alienShip.type);
                         killAlien = true;
                         missilesToRemove.add(mi);
                         break;
@@ -2508,24 +2948,62 @@
 
             // Title
             if (gameState.mode === 'title') {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Decorative frame lines
+                ctx.strokeStyle = crtRgba(0.35);
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(cx - 200, cy - 88);
+                ctx.lineTo(cx + 200, cy - 88);
+                ctx.moveTo(cx - 160, cy + 78);
+                ctx.lineTo(cx + 160, cy + 78);
+                ctx.stroke();
+
                 ctx.fillStyle = ink;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.font = 'bold 48px "Courier New", monospace';
+                ctx.font = 'bold 52px "Courier New", monospace';
                 ctx.shadowColor = ink;
-                ctx.shadowBlur = 16;
-                ctx.fillText('ASTEROIDS', canvas.width / 2, canvas.height / 2 - 40);
-                ctx.font = '20px "Courier New", monospace';
+                ctx.shadowBlur = 18;
+                ctx.fillText('ASTEROIDS', cx, cy - 48);
+                ctx.font = '18px "Courier New", monospace';
                 ctx.shadowBlur = 8;
-                ctx.fillText('CRT EDITION', canvas.width / 2, canvas.height / 2 + 10);
+                ctx.fillText('CRT EDITION', cx, cy - 8);
+
+                // Best high score
+                const best = gameState.leaderboard && gameState.leaderboard[0];
+                ctx.font = '14px "Courier New", monospace';
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = crtTheme.dim;
+                if (best) {
+                    ctx.fillText(
+                        'BEST  ' + best.initials + '  ' + best.score,
+                        cx,
+                        cy + 28
+                    );
+                } else {
+                    ctx.fillText('BEST  ---  0', cx, cy + 28);
+                }
+
+                ctx.fillStyle = ink;
+                ctx.font = '13px "Courier New", monospace';
+                ctx.fillText(
+                    'PHOSPHOR  [  ' + crtTheme.name.toUpperCase() + '  ]',
+                    cx,
+                    cy + 52
+                );
+
                 ctx.font = '16px "Courier New", monospace';
                 ctx.shadowBlur = 6;
                 if (Math.floor(performance.now() / 500) % 2) {
-                    ctx.fillText('PRESS A KEY', canvas.width / 2, canvas.height / 2 + 60);
+                    ctx.fillText('PRESS A KEY', cx, cy + 88);
                 }
                 ctx.shadowBlur = 0;
+                ctx.lineWidth = 2;
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'alphabetic';
             }
@@ -2611,6 +3089,7 @@
 
         // Boot: title with drifting rocks + default green phosphor
         applyCrtTheme(1);
+        if (audioSettings.muted) updateAudioPill('MUTED');
         createAsteroids();
         resetShip();
         ship.invulnerable = 0;
